@@ -28,13 +28,27 @@ func (c *HotstringController) Start() {
 		for {
 			select {
 			case stuff := <-c.cc.InputChan:
+				if stuff.Do == "FlushTreatments" {
+					slog.Info("HotstringController: Flushing treatments (Processing Buffer)")
+					// Trigger processing of the accumulated buffer
+					c.processBuffer()
+
+					// Then output
+					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
+
+					// Clear buffer after processing
+					c.buffer = ""
+					continue
+				}
+
 				// Extract key from input
 				char, ok := stuff.Object.(string)
 				if !ok {
 					continue
 				}
 
-				c.processInput(char)
+				// Only accumulate buffer, do not process yet
+				c.buffer += char
 
 			case <-c.cc.ResetChan:
 				// Reset treatments when output is complete
@@ -45,9 +59,8 @@ func (c *HotstringController) Start() {
 	}()
 }
 
-func (c *HotstringController) processInput(char string) {
-	c.buffer += char
-
+// processBuffer scans the buffer and extracts matches sequentially
+func (c *HotstringController) processBuffer() {
 	// Loop to process buffer for multiple matches
 	matched := true
 	for matched {
@@ -59,7 +72,6 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, target) {
 				slog.Debug("Hotstring Triggered (ESWT)", "trigger", target)
 				c.treatments.SetESWT(*v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target)]
 				matched = true
 				goto NextLoop
@@ -72,7 +84,6 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, target) {
 				slog.Debug("Hotstring Triggered (FirstMeeting)", "trigger", target)
 				c.treatments.SetAddExtraTreatments(v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target)]
 				matched = true
 				goto NextLoop
@@ -85,7 +96,6 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, target) {
 				slog.Debug("Hotstring Triggered (Xrays)", "trigger", target)
 				c.treatments.SetAddExtraTreatments(v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target)]
 				matched = true
 				goto NextLoop
@@ -98,7 +108,6 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, target) {
 				slog.Debug("Hotstring Triggered (Sonos)", "trigger", target)
 				c.treatments.SetAddExtraTreatments(v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target)]
 				matched = true
 				goto NextLoop
@@ -108,10 +117,17 @@ func (c *HotstringController) processInput(char string) {
 		// 5. K_Blocks (Direct keys and Prefix 'c' or 'p')
 		// First check direct keys in K_Blocks
 		for k, v := range hotstrings.K_Blocks {
+			// Exact match check requires suffix check, but since we are processing backwards from end of string usually?
+			// Wait, the logic is: buffer builds up "clm4bshr".
+			// If we process from end (HasSuffix), then "shr" matches first.
+			// buffer becomes "clm4b".
+			// Then "clm4b" (prefixed match) matches.
+			// buffer becomes "".
+			// This order (LIFO-like extraction from end) works for sequential inputs if the components are distinct enough.
+
 			if strings.HasSuffix(c.buffer, k) {
 				slog.Debug("Hotstring Triggered (Blocks-Direct)", "trigger", k, "site", v.GetSite())
 				c.treatments.SetAddInjection(*v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(k)]
 				matched = true
 				goto NextLoop
@@ -125,14 +141,12 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, target_c) {
 				slog.Debug("Hotstring Triggered (Blocks-C)", "trigger", target_c, "site", v.GetSite())
 				c.treatments.SetAddInjection(*v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target_c)]
 				matched = true
 				goto NextLoop
 			} else if strings.HasSuffix(c.buffer, target_p) {
 				slog.Debug("Hotstring Triggered (Blocks-P)", "trigger", target_p, "site", v.GetSite())
 				c.treatments.SetAddInjection(*v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(target_p)]
 				matched = true
 				goto NextLoop
@@ -144,17 +158,11 @@ func (c *HotstringController) processInput(char string) {
 			if strings.HasSuffix(c.buffer, k) {
 				slog.Debug("Hotstring Triggered (Simples)", "trigger", k)
 				c.treatments.SetAddExtraTreatments(v)
-				c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
 				c.buffer = c.buffer[:len(c.buffer)-len(k)]
 				matched = true
 				goto NextLoop
 			}
 		}
 	NextLoop:
-	}
-
-	// Keep buffer size reasonable if no match found
-	if !matched && len(c.buffer) > 200 {
-		c.buffer = c.buffer[100:]
 	}
 }

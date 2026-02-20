@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"bufio"
 	"log/slog"
-	"os"
+
+	"github.com/eiannone/keyboard"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
@@ -21,35 +21,77 @@ func NewInputController(cc *ChannelController) *InputController {
 func (c *InputController) Start() {
 	slog.Info("InputController started. Listening for input...")
 
-	// Simulation: Reading from Stdin for now since no keyboard hook library is configured
 	go func() {
-		reader := bufio.NewReader(os.Stdin)
+		// Open keyboard connection
+		if err := keyboard.Open(); err != nil {
+			slog.Error("Failed to open keyboard", "error", err)
+			return
+		}
+		defer func() {
+			_ = keyboard.Close()
+		}()
+
 		for {
-			r, _, err := reader.ReadRune()
+			r, key, err := keyboard.GetKey()
 			if err != nil {
 				slog.Error("Error reading input", "error", err)
 				break
 			}
 
-			// Ignore newlines for cleaner testing
-			char := string(r)
-			if char == "\n" || char == "\r" {
+			// Quit on Ctrl+C or Esc
+			if key == keyboard.KeyEsc || key == keyboard.KeyCtrlC {
+				slog.Info("Exiting InputController...")
+				return
+			}
+
+			// Simulation: Ctrl+Enter (Checking for rune 10 which is LF, often produced by Ctrl+Enter in terminals)
+			// Or if user presses Enter (rune 13/KeyEnter), we might treat it as flush if desired.
+			// User asked for Ctrl+Enter. Let's try rune 10.
+			if r == 10 || (key == keyboard.KeyEnter && r == 10) {
+				slog.Info("Ctrl+Enter detected - Flushing treatments")
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"FlushTreatments",
+					true,
+					nil,
+				)
 				continue
 			}
 
-			slog.Debug("Input received", "char", char)
+			// Also support Ctrl+Space as alternate flush if Ctrl+Enter is tricky
+			if key == keyboard.KeySpace && r == 0 { // Ctrl+Space often yields rune 0
+				slog.Info("Ctrl+Space detected - Flushing treatments")
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"FlushTreatments",
+					true,
+					nil,
+				)
+				continue
+			}
 
-			// Create ChannelStuff
-			stuff := models.NewChannelStuff(
-				"InputController",
-				"HotstringController",
-				"InputReceived",
-				false,
-				char,
-			)
+			// Ignore normal Enter/Return for now unless it's explicitly needed
+			// But wait, if user types Enter, maybe they want a newline in output?
+			// For hotstrings, usually we ignore whitespace or treat as separator.
+			if key == keyboard.KeyEnter || r == 13 {
+				continue
+			}
 
-			// Send to ChannelController
-			c.cc.InputChan <- stuff
+			// Normal character input
+			if r != 0 {
+				char := string(r)
+				// Create ChannelStuff for normal input
+				stuff := models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"InputReceived",
+					false,
+					char,
+				)
+				c.cc.InputChan <- stuff
+			}
 		}
 	}()
 }

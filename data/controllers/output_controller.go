@@ -24,7 +24,9 @@ func (c *OutputController) Start() {
 			// Check if we received a Treatment update
 			if treatment, ok := stuff.Object.(*models.Treatments); ok {
 				slog.Info("OutputController: Treatment Updated")
-				slog.Info(treatment.ToString())
+
+				// Show final treatment result before reset
+				slog.Info("Final Treatment:", "result", treatment.ToString())
 
 				// Send reset signal to clear treatments
 				c.cc.ResetChan <- true
