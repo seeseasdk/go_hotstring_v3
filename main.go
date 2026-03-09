@@ -26,8 +26,8 @@ func main() {
 	outputController.Start()
 	// Start Hotstring logic
 	hotstringController.Start()
-	// Start Input last (starts listening)
-	inputController.Start()
+	// Start Input last (starts listening) - 고루틴으로 실행
+	go inputController.Start()
 
 	// Block until signal
 	logger.Info("System ready. Waiting for input (Simulated via Stdin)...")

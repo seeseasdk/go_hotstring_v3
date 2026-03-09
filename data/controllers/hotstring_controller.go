@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
@@ -24,31 +26,53 @@ func NewHotstringController(cc *ChannelController) *HotstringController {
 
 func (c *HotstringController) Start() {
 	slog.Info("HotstringController started")
+
 	go func() {
 		for {
 			select {
 			case stuff := <-c.cc.InputChan:
 				if stuff.Do == "FlushTreatments" {
-					slog.Info("HotstringController: Flushing treatments (Processing Buffer)")
+					fmt.Printf("🚀 [FLUSH] Processing buffer: '%s'\n", c.buffer)
+					os.Stdout.Sync()
+
 					// Trigger processing of the accumulated buffer
-					c.processBuffer()
+					output := c.processBuffer()
 
 					// Then output
-					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateTreatment", true, c.treatments)
+					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateOutput", true, output)
 
 					// Clear buffer after processing
 					c.buffer = ""
 					continue
 				}
 
-				// Extract key from input
-				char, ok := stuff.Object.(string)
-				if !ok {
+				// AddChar message processing
+				if stuff.Do == "AddChar" {
+					if charMap, ok := stuff.Object.(map[string]interface{}); ok {
+						if char, exists := charMap["char"]; exists {
+							if charRune, ok := char.(rune); ok {
+								c.buffer += string(charRune)
+								fmt.Printf("📝 [BUFFER] '%s'\n", c.buffer)
+								os.Stdout.Sync()
+							}
+						}
+					}
 					continue
 				}
 
-				// Only accumulate buffer, do not process yet
-				c.buffer += char
+				// Backspace message processing
+				if stuff.Do == "Backspace" {
+					if len(c.buffer) > 0 {
+						// Remove the last character (considering unicode/runes properly by converting to runes first)
+						runes := []rune(c.buffer)
+						if len(runes) > 0 {
+							c.buffer = string(runes[:len(runes)-1])
+						}
+						fmt.Printf("🔙 [BUFFER] '%s'\n", c.buffer)
+						os.Stdout.Sync()
+					}
+					continue
+				}
 
 			case <-c.cc.ResetChan:
 				// Reset treatments when output is complete
@@ -59,110 +83,323 @@ func (c *HotstringController) Start() {
 	}()
 }
 
-// processBuffer scans the buffer and extracts matches sequentially
-func (c *HotstringController) processBuffer() {
-	// Loop to process buffer for multiple matches
-	matched := true
-	for matched {
-		matched = false
+// processBuffer scans the buffer and extracts matches sequentially by position
+func (c *HotstringController) processBuffer() *models.OutputStuff {
+	// 모든 가능한 매치를 찾아서 위치별로 정렬
+	type Match struct {
+		position int
+		length   int
+		category string
+		key      string
+		baseKey  string
+		value    interface{}
+	}
 
-		// 1. K_ESWT_ONLY (Prefix 'e')
+	var matches []Match
+
+	isFirstMeetingMode := strings.HasPrefix(c.buffer, "z")
+
+	if isFirstMeetingMode {
+		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting만 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
+		for k, v := range hotstrings.K_FirstMeeting {
+			idx := 1 // 'z' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], k)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(k), "FirstMeeting", k, k, v})
+				idx = actualPos + len(k)
+			}
+		}
+	} else {
+		// 1. K_ESWT_ONLY (Prefix 'e') 매치 찾기
 		for k, v := range hotstrings.K_ESWT_ONLY {
 			target := "e" + k
-			if strings.HasSuffix(c.buffer, target) {
-				slog.Debug("Hotstring Triggered (ESWT)", "trigger", target)
-				c.treatments.SetESWT(*v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, target); idx != -1 {
+				matches = append(matches, Match{idx, len(target), "ESWT", target, k, v})
 			}
 		}
 
-		// 2. K_FirstMeeting (Prefix 'z')
+		// 2. K_FirstMeeting (Prefix 'z') 매치 찾기 (혹시 z가 중간에 있는 경우 대비)
 		for k, v := range hotstrings.K_FirstMeeting {
 			target := "z" + k
-			if strings.HasSuffix(c.buffer, target) {
-				slog.Debug("Hotstring Triggered (FirstMeeting)", "trigger", target)
-				c.treatments.SetAddExtraTreatments(v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, target); idx != -1 {
+				matches = append(matches, Match{idx, len(target), "FirstMeeting", target, k, v})
 			}
 		}
 
-		// 3. K_Xrays (Prefix 'x')
+		// 3. K_Xrays (Prefix 'x') 매치 찾기
 		for k, v := range hotstrings.K_Xrays {
 			target := "x" + k
-			if strings.HasSuffix(c.buffer, target) {
-				slog.Debug("Hotstring Triggered (Xrays)", "trigger", target)
-				c.treatments.SetAddExtraTreatments(v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, target); idx != -1 {
+				matches = append(matches, Match{idx, len(target), "Xrays", target, k, v})
 			}
 		}
 
-		// 4. K_Sonos (Prefix 's')
+		// 4. K_Sonos (Prefix 's') 매치 찾기
 		for k, v := range hotstrings.K_Sonos {
 			target := "s" + k
-			if strings.HasSuffix(c.buffer, target) {
-				slog.Debug("Hotstring Triggered (Sonos)", "trigger", target)
-				c.treatments.SetAddExtraTreatments(v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, target); idx != -1 {
+				matches = append(matches, Match{idx, len(target), "Sonos", target, k, v})
 			}
 		}
 
-		// 5. K_Blocks (Direct keys and Prefix 'c' or 'p')
-		// First check direct keys in K_Blocks
+		// 5. K_Blocks 직접 키 매치 찾기
 		for k, v := range hotstrings.K_Blocks {
-			// Exact match check requires suffix check, but since we are processing backwards from end of string usually?
-			// Wait, the logic is: buffer builds up "clm4bshr".
-			// If we process from end (HasSuffix), then "shr" matches first.
-			// buffer becomes "clm4b".
-			// Then "clm4b" (prefixed match) matches.
-			// buffer becomes "".
-			// This order (LIFO-like extraction from end) works for sequential inputs if the components are distinct enough.
-
-			if strings.HasSuffix(c.buffer, k) {
-				slog.Debug("Hotstring Triggered (Blocks-Direct)", "trigger", k, "site", v.GetSite())
-				c.treatments.SetAddInjection(*v)
-				c.buffer = c.buffer[:len(c.buffer)-len(k)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, k); idx != -1 {
+				matches = append(matches, Match{idx, len(k), "Blocks-Direct", k, k, v})
 			}
 		}
 
-		// Then check prefix-based matches
+		// 6. K_Blocks 프리픽스 매치 찾기 ('c', 'p')
 		for k, v := range hotstrings.K_Blocks {
-			target_c := "c" + k
+			// 관절 부위(sh, kn, ak, eb, wr)나 caudal 자체는 C-arm(c) prefix를 거의 쓰지 않으므로, c를 단독으로(caudal) 식별할 수 있게 prefix 조합에서 제외
+			isJoint := strings.HasPrefix(k, "sh") || strings.HasPrefix(k, "kn") || strings.HasPrefix(k, "ak") || strings.HasPrefix(k, "eb") || strings.HasPrefix(k, "wr") || k == "caudal"
+			if !isJoint {
+				target_c := "c" + k
+				if idx := strings.Index(c.buffer, target_c); idx != -1 {
+					matches = append(matches, Match{idx, len(target_c), "Blocks-C", target_c, k, v})
+				}
+			}
+
 			target_p := "p" + k
-			if strings.HasSuffix(c.buffer, target_c) {
-				slog.Debug("Hotstring Triggered (Blocks-C)", "trigger", target_c, "site", v.GetSite())
-				c.treatments.SetAddInjection(*v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target_c)]
-				matched = true
-				goto NextLoop
-			} else if strings.HasSuffix(c.buffer, target_p) {
-				slog.Debug("Hotstring Triggered (Blocks-P)", "trigger", target_p, "site", v.GetSite())
-				c.treatments.SetAddInjection(*v)
-				c.buffer = c.buffer[:len(c.buffer)-len(target_p)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, target_p); idx != -1 {
+				matches = append(matches, Match{idx, len(target_p), "Blocks-P", target_p, k, v})
 			}
 		}
 
-		// 6. K_Simples (Others)
+		// 7. K_Simples 매치 찾기
 		for k, v := range hotstrings.K_Simples {
-			if strings.HasSuffix(c.buffer, k) {
-				slog.Debug("Hotstring Triggered (Simples)", "trigger", k)
-				c.treatments.SetAddExtraTreatments(v)
-				c.buffer = c.buffer[:len(c.buffer)-len(k)]
-				matched = true
-				goto NextLoop
+			if idx := strings.Index(c.buffer, k); idx != -1 {
+				matches = append(matches, Match{idx, len(k), "Simples", k, k, v})
 			}
 		}
-	NextLoop:
 	}
+
+	// 위치 순으로 정렬 (앞에서부터), 같은 위치면 긴 것이 우선 (Longest match first)
+	for i := 0; i < len(matches)-1; i++ {
+		for j := i + 1; j < len(matches); j++ {
+			if matches[i].position > matches[j].position {
+				matches[i], matches[j] = matches[j], matches[i]
+			} else if matches[i].position == matches[j].position {
+				if matches[i].length < matches[j].length {
+					matches[i], matches[j] = matches[j], matches[i]
+				}
+			}
+		}
+	}
+
+	// 겹치지 않는 매치들을 순서대로 처리
+	processed := make(map[int]bool)
+	output := models.NewOutputStuff(len(c.buffer), "", "", "", []string{}, "", "", "")
+
+	var combinedFirstMeeting *models.FirstMeeting
+
+	for _, match := range matches {
+		// 이미 처리된 부분과 겹치는지 확인
+		overlap := false
+		for pos := match.position; pos < match.position+match.length; pos++ {
+			if processed[pos] {
+				overlap = true
+				break
+			}
+		}
+
+		if !overlap {
+			// 처리된 위치 표시 - 매치 길이만큼 일단 다 표시
+			for pos := match.position; pos < match.position+match.length; pos++ {
+				processed[pos] = true
+			}
+
+			// 접미사 'e', 's', 'pe'가 있는지 확인 (각각 ESWT, SonoStim, PainEraser 처리를 추가하기 위함)
+			// 여러 접미사가 연달아 올 수 처리 (예: ...pes, ...espe)
+			if match.category != "ESWT" && match.category != "Sonos" {
+				remainderPos := match.position + match.length
+				for remainderPos < len(c.buffer) && !processed[remainderPos] {
+					remainder := c.buffer[remainderPos:]
+					matchedSuffix := false
+
+					if strings.HasPrefix(remainder, "pe") {
+						if peVal, exists := hotstrings.K_PainEraser[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (PainEraser Suffix)", "trigger", match.key+"pe", "baseKey", match.baseKey)
+							c.treatments.SetAddExtraTreatments(*peVal)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						}
+					} else if strings.HasPrefix(remainder, "e") {
+						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (ESWT Suffix)", "trigger", match.key+"e", "baseKey", match.baseKey)
+							c.treatments.SetESWT(*eswtVal)
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
+						}
+					} else if strings.HasPrefix(remainder, "s") {
+						if sntVal, exists := hotstrings.K_SonoStim[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (SonoStim Suffix)", "trigger", match.key+"s", "baseKey", match.baseKey)
+							c.treatments.SetAddExtraTreatments(*sntVal)
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
+						}
+					}
+
+					if !matchedSuffix {
+						break
+					}
+				}
+			}
+
+			// 매치 처리
+			switch match.category {
+			case "ESWT":
+				slog.Debug("Hotstring Triggered (ESWT)", "trigger", match.key)
+				c.treatments.SetESWT(*match.value.(*models.ESWT))
+			case "FirstMeeting":
+				firstMeeting := match.value.(*models.FirstMeeting)
+				slog.Debug("Hotstring Triggered (FirstMeeting)", "trigger", match.key, "sites", firstMeeting.GetSites())
+
+				if combinedFirstMeeting == nil {
+					// 새로운 객체를 만들어서 복사 (참조를 막기 위함)
+					combinedFirstMeeting = models.NewFirstMeeting(
+						append([]string{}, firstMeeting.GetSites()...),
+						firstMeeting.GetPhysicalExam(),
+						append([]models.Xray{}, firstMeeting.GetXray()...),
+						append([]any{}, firstMeeting.GetExtraExam()...),
+					)
+					combinedFirstMeeting.SetDuration(firstMeeting.GetDuration())
+				} else {
+					combinedFirstMeeting.Merge(firstMeeting)
+				}
+			case "Xrays":
+				slog.Debug("Hotstring Triggered (Xrays)", "trigger", match.key)
+				xray, ok := match.value.(*models.Xray)
+				if ok {
+					curChart := output.GetChartText()
+					if curChart != "" {
+						output.SetChartText(curChart + "\n" + xray.GetText())
+					} else {
+						output.SetChartText(xray.GetText())
+					}
+					output.AddOrderCode(xray.GetCode())
+				}
+			case "Sonos":
+				slog.Debug("Hotstring Triggered (Sonos)", "trigger", match.key)
+				sono, ok := match.value.(*models.Sono)
+				if ok {
+					curChart := output.GetChartText()
+					if curChart != "" {
+						output.SetChartText(curChart + "\n" + sono.GetText())
+					} else {
+						output.SetChartText(sono.GetText())
+					}
+					output.AddOrderCode(sono.GetCode())
+				}
+			case "Blocks-Direct", "Blocks-C", "Blocks-P":
+				injection := match.value.(*models.Injection)
+				slog.Debug("Hotstring Triggered (Blocks)", "trigger", match.key, "site", injection.GetSite())
+				c.treatments.SetAddInjection(*injection)
+			case "Simples":
+				slog.Debug("Hotstring Triggered (Simples)", "trigger", match.key)
+				simple, ok := match.value.(*models.SimpleInput)
+				if ok {
+					curSimple := output.GetSimpleText()
+					if curSimple != "" {
+						output.SetSimpleText(curSimple + "\n" + simple.GetText())
+					} else {
+						output.SetSimpleText(simple.GetText())
+					}
+					if simple.GetExtraDo() != "" {
+						output.SetExtraDo(simple.GetExtraDo())
+					}
+				}
+			}
+		}
+	}
+
+	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
+	leftoverP := false
+	for i := 0; i < len(c.buffer); i++ {
+		if !processed[i] {
+			if c.buffer[i] == 'c' {
+				if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
+					slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
+					c.treatments.SetAddInjection(*caudalVal)
+					processed[i] = true
+				}
+			} else if c.buffer[i] == 'p' {
+				slog.Debug("Hotstring Triggered (Leftover 'p' -> isP=true)")
+				leftoverP = true
+				processed[i] = true
+			}
+		}
+	}
+
+	if leftoverP {
+		c.treatments.SetAllInjectionsIsP(true)
+	}
+
+	if combinedFirstMeeting != nil {
+		newChart := combinedFirstMeeting.GetChartText()
+		curChart := output.GetChartText()
+		if curChart != "" && newChart != "" {
+			// FirstMeeting의 내용이 다른 항목들보다 먼저 나오는 것이 자연스러우므로 앞에 배치합니다.
+			output.SetChartText(newChart + "\n" + curChart)
+		} else if newChart != "" {
+			output.SetChartText(newChart)
+		}
+		output.AddOrderCodeList(combinedFirstMeeting.GetAllCodes())
+	}
+
+	if !c.treatments.IsEmpty() {
+		// 우선순위에 맞게 정렬 (caudal, mbb 등 순서 보장)
+		c.treatments.SortInjections()
+
+		chartText := output.GetChartText()
+		newChartText := c.treatments.GetTextForChart()
+		if newChartText != "" {
+			if chartText != "" {
+				output.SetChartText(chartText + "\n" + newChartText)
+			} else {
+				output.SetChartText(newChartText)
+			}
+		}
+
+		spec := output.GetSpecificText()
+		newSpec := c.treatments.GetTextForSpecific()
+		if newSpec != "" {
+			if spec != "" {
+				output.SetSpecificText(spec + "\n" + newSpec)
+			} else {
+				output.SetSpecificText(newSpec)
+			}
+		}
+
+		mx := output.GetMx999Text()
+		newMx := c.treatments.GetTextForMx999()
+		if newMx != "" {
+			if mx != "" {
+				output.SetMx999Text(mx + "\n" + newMx)
+			} else {
+				output.SetMx999Text(newMx)
+			}
+		}
+
+		codes, _ := c.treatments.GetOrderCode()
+		output.AddOrderCodeList(codes)
+
+		drug := c.treatments.GetDrug()
+		if drug != "" {
+			output.SetDrug(drug)
+		}
+	}
+
+	return output
 }

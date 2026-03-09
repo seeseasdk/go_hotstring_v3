@@ -94,6 +94,69 @@ func (fm *FirstMeeting) GetAllCodes() []string {
 	}
 	return allCodes
 }
+
+func (fm *FirstMeeting) Merge(other *FirstMeeting) {
+	// sites 병합 (중복 제거)
+	for _, osite := range other.sites {
+		found := false
+		for _, fsite := range fm.sites {
+			if fsite == osite {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fm.sites = append(fm.sites, osite)
+		}
+	}
+
+	// duration 병합 (한쪽만 있으면 하나로 덮어쓰거나 무시, 일단 그냥 둠)
+	if fm.duration == "" && other.duration != "" {
+		fm.duration = other.duration
+	}
+
+	// physicalExam 병합 (단순 문자열 포함 여부로 중복 제거)
+	if other.physicalExam != "" {
+		if fm.physicalExam == "" {
+			fm.physicalExam = other.physicalExam
+		} else if !strings.Contains(fm.physicalExam, other.physicalExam) && !strings.Contains(other.physicalExam, fm.physicalExam) {
+			fm.physicalExam += "\n" + other.physicalExam
+		}
+	}
+
+	// xray 병합 (중복 제거 기준: Code)
+	for _, ox := range other.xray {
+		found := false
+		for _, fx := range fm.xray {
+			if fx.GetCode() == ox.GetCode() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fm.xray = append(fm.xray, ox)
+		}
+	}
+
+	// extraExam 병합 (Sono 일 때 Code로 중복 확인)
+	for _, oe := range other.extraExam {
+		found := false
+		if os, osk := oe.(*Sono); osk {
+			for _, fe := range fm.extraExam {
+				if fs, fsk := fe.(*Sono); fsk {
+					if os.GetCode() == fs.GetCode() {
+						found = true
+						break
+					}
+				}
+			}
+		}
+		if !found {
+			fm.extraExam = append(fm.extraExam, oe)
+		}
+	}
+}
+
 func (fm *FirstMeeting) ToString() string {
 	var temXray, tempExtraExam string
 	for _, x := range fm.xray {

@@ -44,6 +44,11 @@ func (i *Treatments) SetAddExtraTreatments(extraTreatment any) {
 func (i *Treatments) SetIsP(isP bool) {
 	i.isP = isP
 }
+func (i *Treatments) SetAllInjectionsIsP(isP bool) {
+	for idx := range i.injections {
+		i.injections[idx].SetIsP(isP) // assuming Injection has SetIsP, else i.injections[idx].isP = isP
+	}
+}
 func (i *Treatments) SetDrug(drugDays string) {
 	i.drug = drugDays
 }
@@ -62,13 +67,19 @@ func (i *Treatments) SortInjections() {
 }
 
 func getPriority(site string) int {
+	// mbb 등 메인 척추 시술이 첫 번째(c) 기호 표시)가 되어야 하므로 가장 높은 우선순위(3)를 줍니다.
 	if strings.Contains(site, "mbb") || strings.Contains(site, "fjb") ||
 		strings.Contains(site, "snrb") || strings.Contains(site, "drgb") ||
 		strings.Contains(site, "cpb") || strings.Contains(site, "pcb") ||
 		strings.Contains(site, "pdnb") || strings.Contains(site, "intercostal") ||
 		strings.Contains(site, "quadratus") || strings.Contains(site, "trapezius") {
+		return 3
+	}
+	// caudal은 두 번째에 와야 하므로 중간 우선순위(2)를 줍니다.
+	if strings.Contains(site, "caudal") {
 		return 2
 	}
+	// 그 외(어깨 IA 등 관절 주사 등)는 세 번째(1)로 갑니다.
 	return 1
 }
 func (i *Treatments) SetReset() {
@@ -542,8 +553,10 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 	// if firstCode == "" {
 	// 	return nil, fmt.Errorf("no first code found")
 	// }
-	injectCode = firstCode + secondCode // + thirdCode
-	result = append(result, injectCode)
+	if firstCode != "" || secondCode != "" {
+		injectCode = firstCode + secondCode // + thirdCode
+		result = append(result, injectCode)
+	}
 
 	for _, extra := range i.extraTreatments {
 		switch extra := extra.(type) {
@@ -560,7 +573,10 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 			}
 		case SonoStim:
 			if !extra.IsEmpty() {
-				if extra.GetDirection() == "both" {
+				code := extra.GetCode()
+				if code != "" {
+					result = append(result, code)
+				} else if extra.GetDirection() == "both" {
 					result = append(result, constants.K_BOTH_SNT)
 				} else {
 					result = append(result, constants.K_SINGLE_SNT)
@@ -568,7 +584,10 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 			}
 		case PainEraser:
 			if !extra.IsEmpty() {
-				if extra.GetDirection() == "both" {
+				code := extra.GetCode()
+				if code != "" {
+					result = append(result, code)
+				} else if extra.GetDirection() == "both" {
 					result = append(result, constants.K_BOTH_PAIN_ERASER)
 				} else {
 					result = append(result, constants.K_SINGLE_PAIN_ERASER)

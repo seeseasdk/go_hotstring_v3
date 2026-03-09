@@ -19,16 +19,19 @@ func NewOutputController(cc *ChannelController) *OutputController {
 
 func (c *OutputController) Start() {
 	slog.Info("OutputController started")
+
 	go func() {
 		for stuff := range c.cc.OutputChan {
-			// Check if we received a Treatment update
-			if treatment, ok := stuff.Object.(*models.Treatments); ok {
-				slog.Info("OutputController: Treatment Updated")
+			// Check if we received an OutputStuff update
+			if output, ok := stuff.Object.(*models.OutputStuff); ok {
+				slog.Info("OutputController: Output Updated")
 
-				// Show final treatment result before reset
-				slog.Info("Final Treatment:", "result", treatment.ToString())
+				// Show final output result before reset
+				result := output.ToString()
+				slog.Info("Final Output:", "result", result)
+				fmt.Printf("✅ [COMPLETED] %s\n", result)
 
-				// Send reset signal to clear treatments
+				// Send reset signal to clear
 				c.cc.ResetChan <- true
 				slog.Info("OutputController: Reset signal sent")
 

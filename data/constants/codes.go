@@ -65,6 +65,9 @@ const (
 	K_SINGLE_ESWT        = ".+999_e5"
 	K_ESWT_FREE          = "ef"
 	K_ESWT_FREE_RADIAL   = "efr"
+	K_SONOSTIM           = "+999_s"
+	K_BOTH_SONOSTIM      = "+999_sb"
+	K_PAIN_ERASER        = "pe0"
 )
 
 var K_FIRST_BLOCKS = []string{
