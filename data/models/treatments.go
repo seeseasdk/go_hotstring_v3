@@ -16,6 +16,7 @@ type Treatments struct {
 	injections      []Injection
 	extraTreatments []any
 	isP             bool
+	hasSeven        bool
 	drug            string
 	followUp        string
 	eSWT            ESWT
@@ -410,6 +411,10 @@ func (i Treatments) GetTextForMx999() string {
 	}
 	return text
 }
+func (i *Treatments) SetHasSeven(hasSeven bool) {
+	i.hasSeven = hasSeven
+}
+
 func (i Treatments) GetOrderCode() ([]string, error) {
 	var firstCode string
 	var secondCode string
@@ -555,6 +560,9 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 	// }
 	if firstCode != "" || secondCode != "" {
 		injectCode = firstCode + secondCode // + thirdCode
+		if i.hasSeven {
+			injectCode += "7"
+		}
 		result = append(result, injectCode)
 	}
 

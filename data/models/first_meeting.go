@@ -195,6 +195,9 @@ func (fm FirstMeeting) GetChartText() string {
 	dayMonYear := "d"
 
 	if fm.duration != "" {
+		if strings.Contains(fm.duration, "d") {
+			dayMonYear = ""
+		}
 		if strings.Contains(fm.duration, "m") {
 			dayMonYear = ""
 		}

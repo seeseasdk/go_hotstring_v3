@@ -528,7 +528,7 @@ var K_Simples = map[string]*models.SimpleInput{
 }
 
 var K_SIMPLE_CODE = map[string]string{
-	"pf":     ".+999_pf",
+	"pt0":    ".+999_pf",
 	"pt1":    ".+999_pt1",
 	"pt2":    ".+999_pt2",
 	"pt3":    ".+999_pt3",
@@ -792,4 +792,21 @@ var K_Sonos = map[string]*models.Sono{
 	"akb": models.NewSono("both ankle sono:", "sono6"),
 	"akr": models.NewSono("Rt. ankle sono:", "sono3"),
 	"akl": models.NewSono("Lt. ankle sono:", "sono3"),
+}
+
+var K_Drugs = map[string]string{
+	"d":  ".+51",
+	"du": ".+511",
+	"dp": ".+52",
+}
+
+var _K_Coordinates = map[string]*models.Coordinate{
+	"chartWindow":    &models.Coordinate{X: 1000, Y: 300},
+	"specificWindow": &models.Coordinate{X: 1400, Y: 300},
+	"orderWindow":    &models.Coordinate{X: 620, Y: 970},
+	"mx990Window":    &models.Coordinate{X: 1700, Y: 500},
+	"memoWindow":     &models.Coordinate{X: 1700, Y: 400},
+	"drugDayWindow":  &models.Coordinate{X: 870, Y: 514},
+	"completeButton": &models.Coordinate{X: 960, Y: 990},
+	"pacsButton":     &models.Coordinate{X: 820, Y: 70},
 }

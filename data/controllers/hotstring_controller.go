@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
@@ -97,7 +98,48 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 	var matches []Match
 
+	// 0. K_Drugs 매치 찾기 (d, du, dp + 숫자. 예: d3, du7)
+	drugRegex := regexp.MustCompile(`(du|dp|d)(\d+)`)
+	drugMatches := drugRegex.FindAllStringSubmatchIndex(c.buffer, -1)
+	for _, dm := range drugMatches {
+		fullMatchStart := dm[0]
+		fullMatchEnd := dm[1]
+		prefixStart := dm[2]
+		prefixEnd := dm[3]
+		numStart := dm[4]
+		numEnd := dm[5]
+
+		fullStr := c.buffer[fullMatchStart:fullMatchEnd]
+		prefix := c.buffer[prefixStart:prefixEnd]
+		numStr := c.buffer[numStart:numEnd]
+
+		matches = append(matches, Match{
+			position: fullMatchStart,
+			length:   len(fullStr),
+			category: "Drugs",
+			key:      fullStr,
+			baseKey:  prefix,
+			value:    numStr,
+		})
+	}
+
+	// 1. K_Simples 매치 찾기 (최우선: 모든 모드보다 먼저 검사)
+	for k, v := range hotstrings.K_Simples {
+		if idx := strings.Index(c.buffer, k); idx != -1 {
+			matches = append(matches, Match{idx, len(k), "Simples", k, k, v})
+		}
+	}
+
+	// 2. K_SIMPLE_CODE 매치 찾기 (최우선: 모든 모드보다 먼저 검사)
+	for k, v := range hotstrings.K_SIMPLE_CODE {
+		if idx := strings.Index(c.buffer, k); idx != -1 {
+			matches = append(matches, Match{idx, len(k), "SimpleCode", k, k, v})
+		}
+	}
+
 	isFirstMeetingMode := strings.HasPrefix(c.buffer, "z")
+	isXrayMode := strings.HasPrefix(c.buffer, "x")
+	isSonoMode := strings.HasPrefix(c.buffer, "s")
 
 	if isFirstMeetingMode {
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting만 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
@@ -116,8 +158,40 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				idx = actualPos + len(k)
 			}
 		}
+	} else if isXrayMode {
+		for k, v := range hotstrings.K_Xrays {
+			idx := 1 // 'x' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], k)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(k), "Xrays", k, k, v})
+				idx = actualPos + len(k)
+			}
+		}
+	} else if isSonoMode {
+		for k, v := range hotstrings.K_Sonos {
+			idx := 1 // 's' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], k)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(k), "Sonos", k, k, v})
+				idx = actualPos + len(k)
+			}
+		}
 	} else {
-		// 1. K_ESWT_ONLY (Prefix 'e') 매치 찾기
+		// 3. K_ESWT_ONLY (Prefix 'e') 매치 찾기
 		for k, v := range hotstrings.K_ESWT_ONLY {
 			target := "e" + k
 			if idx := strings.Index(c.buffer, target); idx != -1 {
@@ -125,7 +199,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			}
 		}
 
-		// 2. K_FirstMeeting (Prefix 'z') 매치 찾기 (혹시 z가 중간에 있는 경우 대비)
+		// 4. K_FirstMeeting (Prefix 'z') 매치 찾기 (혹시 z가 중간에 있는 경우 대비)
 		for k, v := range hotstrings.K_FirstMeeting {
 			target := "z" + k
 			if idx := strings.Index(c.buffer, target); idx != -1 {
@@ -133,7 +207,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			}
 		}
 
-		// 3. K_Xrays (Prefix 'x') 매치 찾기
+		// 5. K_Xrays (Prefix 'x') 매치 찾기
 		for k, v := range hotstrings.K_Xrays {
 			target := "x" + k
 			if idx := strings.Index(c.buffer, target); idx != -1 {
@@ -141,7 +215,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			}
 		}
 
-		// 4. K_Sonos (Prefix 's') 매치 찾기
+		// 6. K_Sonos (Prefix 's') 매치 찾기
 		for k, v := range hotstrings.K_Sonos {
 			target := "s" + k
 			if idx := strings.Index(c.buffer, target); idx != -1 {
@@ -149,14 +223,14 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			}
 		}
 
-		// 5. K_Blocks 직접 키 매치 찾기
+		// 7. K_Blocks 직접 키 매치 찾기
 		for k, v := range hotstrings.K_Blocks {
 			if idx := strings.Index(c.buffer, k); idx != -1 {
 				matches = append(matches, Match{idx, len(k), "Blocks-Direct", k, k, v})
 			}
 		}
 
-		// 6. K_Blocks 프리픽스 매치 찾기 ('c', 'p')
+		// 8. K_Blocks 프리픽스 매치 찾기 ('c', 'p')
 		for k, v := range hotstrings.K_Blocks {
 			// 관절 부위(sh, kn, ak, eb, wr)나 caudal 자체는 C-arm(c) prefix를 거의 쓰지 않으므로, c를 단독으로(caudal) 식별할 수 있게 prefix 조합에서 제외
 			isJoint := strings.HasPrefix(k, "sh") || strings.HasPrefix(k, "kn") || strings.HasPrefix(k, "ak") || strings.HasPrefix(k, "eb") || strings.HasPrefix(k, "wr") || k == "caudal"
@@ -170,13 +244,6 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			target_p := "p" + k
 			if idx := strings.Index(c.buffer, target_p); idx != -1 {
 				matches = append(matches, Match{idx, len(target_p), "Blocks-P", target_p, k, v})
-			}
-		}
-
-		// 7. K_Simples 매치 찾기
-		for k, v := range hotstrings.K_Simples {
-			if idx := strings.Index(c.buffer, k); idx != -1 {
-				matches = append(matches, Match{idx, len(k), "Simples", k, k, v})
 			}
 		}
 	}
@@ -218,7 +285,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 			// 접미사 'e', 's', 'pe'가 있는지 확인 (각각 ESWT, SonoStim, PainEraser 처리를 추가하기 위함)
 			// 여러 접미사가 연달아 올 수 처리 (예: ...pes, ...espe)
-			if match.category != "ESWT" && match.category != "Sonos" {
+			if match.category != "Sonos" && match.category != "Xrays" && match.category != "FirstMeeting" {
 				remainderPos := match.position + match.length
 				for remainderPos < len(c.buffer) && !processed[remainderPos] {
 					remainder := c.buffer[remainderPos:]
@@ -249,6 +316,10 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 							remainderPos += 1
 							matchedSuffix = true
 						}
+					} else if remainder[0] == 'p' || remainder[0] == 'c' {
+						// 'p'(isP 속성)나 'c'(caudal) 문자가 중간에 끼어 있어도 뒤의 leftover 루프에서 처리할 수 있도록, 무시하고 다음 접미사 탐색을 계속함
+						remainderPos += 1
+						matchedSuffix = true
 					}
 
 					if !matchedSuffix {
@@ -259,6 +330,15 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 			// 매치 처리
 			switch match.category {
+			case "Drugs":
+				slog.Debug("Hotstring Triggered (Drugs)", "trigger", match.key, "drugDays", match.value)
+				days, ok := match.value.(string)
+				if ok {
+					output.SetDrug(days)
+					if oc, exists := hotstrings.K_Drugs[match.baseKey]; exists {
+						output.AddOrderCode(oc)
+					}
+				}
 			case "ESWT":
 				slog.Debug("Hotstring Triggered (ESWT)", "trigger", match.key)
 				c.treatments.SetESWT(*match.value.(*models.ESWT))
@@ -320,10 +400,14 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 						output.SetExtraDo(simple.GetExtraDo())
 					}
 				}
+				case "SimpleCode":
+					slog.Debug("Hotstring Triggered (SimpleCode)", "trigger", match.key)
+					strCode, ok := match.value.(string)
+					if ok {
+						output.AddOrderCode(strCode)
+					}				}
 			}
 		}
-	}
-
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
 	leftoverP := false
 	for i := 0; i < len(c.buffer); i++ {
@@ -338,12 +422,24 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				slog.Debug("Hotstring Triggered (Leftover 'p' -> isP=true)")
 				leftoverP = true
 				processed[i] = true
+			} else if c.buffer[i] == '7' {
+				slog.Debug("Hotstring Triggered (Leftover '7' -> hasSeven=true)")
+				c.treatments.SetHasSeven(true)
+				processed[i] = true
 			}
 		}
 	}
 
 	if leftoverP {
 		c.treatments.SetAllInjectionsIsP(true)
+	}
+
+	if isFirstMeetingMode && combinedFirstMeeting != nil {
+		re := regexp.MustCompile(`f(\d+[dmyw]?)`)
+		durationMatches := re.FindStringSubmatch(c.buffer)
+		if len(durationMatches) > 1 {
+			combinedFirstMeeting.SetDuration(durationMatches[1])
+		}
 	}
 
 	if combinedFirstMeeting != nil {
