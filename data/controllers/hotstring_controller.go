@@ -400,14 +400,15 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 						output.SetExtraDo(simple.GetExtraDo())
 					}
 				}
-				case "SimpleCode":
-					slog.Debug("Hotstring Triggered (SimpleCode)", "trigger", match.key)
-					strCode, ok := match.value.(string)
-					if ok {
-						output.AddOrderCode(strCode)
-					}				}
+			case "SimpleCode":
+				slog.Debug("Hotstring Triggered (SimpleCode)", "trigger", match.key)
+				strCode, ok := match.value.(string)
+				if ok {
+					output.AddOrderCode(strCode)
+				}
 			}
 		}
+	}
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
 	leftoverP := false
 	for i := 0; i < len(c.buffer); i++ {
