@@ -42,6 +42,13 @@ type Coordinate struct {
 	Y int
 }
 
+func NewCoordinate(x, y int) *Coordinate {
+	return &Coordinate{
+		X: x,
+		Y: y,
+	}
+}
+
 func (c *Coordinate) ToString() string {
 	return "X: " + fmt.Sprint(c.X) + ", Y: " + fmt.Sprint(c.Y)
 }

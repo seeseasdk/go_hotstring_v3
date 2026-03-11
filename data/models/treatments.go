@@ -19,6 +19,7 @@ type Treatments struct {
 	hasSeven        bool
 	drug            string
 	followUp        string
+	clipboardMemos  []string
 	eSWT            ESWT
 }
 
@@ -30,6 +31,7 @@ func NewTreatments() *Treatments {
 		isP:             false,
 		drug:            "",
 		followUp:        "",
+		clipboardMemos:  []string{},
 		eSWT:            *NewESWT("", "", "", "", false),
 	}
 }
@@ -55,6 +57,9 @@ func (i *Treatments) SetDrug(drugDays string) {
 }
 func (i *Treatments) SetFollowUp(followUp string) {
 	i.followUp = followUp
+}
+func (i *Treatments) AddClipboardMemo(memo string) {
+	i.clipboardMemos = append(i.clipboardMemos, memo)
 }
 func (i *Treatments) SetESWT(eswt ESWT) {
 	i.eSWT = eswt
@@ -90,6 +95,7 @@ func (i *Treatments) SetReset() {
 	i.isP = false
 	i.drug = ""
 	i.followUp = ""
+	i.clipboardMemos = []string{}
 	i.eSWT.SetReset()
 	log.Debug("models/treatment.go", "treatment", "treatment reset")
 }
@@ -190,6 +196,10 @@ func (i Treatments) GetTextForChart() string {
 	periTreat := ""
 
 	for _, inject := range i.injections {
+		if inject.isFromClipboard {
+			continue
+		}
+
 		switch inject.isP {
 		case true:
 			p = "p"
@@ -346,6 +356,16 @@ func (i Treatments) GetTextForSpecific() string {
 			}
 		}
 	}
+
+	// 클립보드 매모(복사한 텍스트)를 specificText에 추가 반영
+	for _, memo := range i.clipboardMemos {
+		if text == "" {
+			text += memo + "\n"
+		} else {
+			text += "                " + memo + "\n"
+		}
+	}
+
 	return text
 }
 func (i Treatments) GetTextForMx999() string {
@@ -418,7 +438,12 @@ func (i *Treatments) SetHasSeven(hasSeven bool) {
 func (i Treatments) GetOrderCode() ([]string, error) {
 	var firstCode string
 	var secondCode string
-	var injections = i.injections
+	var injections []Injection
+	for _, inj := range i.injections {
+		if !inj.isFromClipboard {
+			injections = append(injections, inj)
+		}
+	}
 	// var thirdCode string
 	var injectCode string
 	var result []string

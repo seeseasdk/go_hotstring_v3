@@ -61,6 +61,105 @@ func (c *HotstringController) Start() {
 					continue
 				}
 
+				// AddClipboardMemo 처리 추가
+				if stuff.Do == "AddClipboardMemo" {
+					if text, ok := stuff.Object.(string); ok {
+						// 클립보드 텍스트를 줄 단위로 분리하여 Injection 객체로 만듦
+						lines := strings.Split(text, "\n")
+						lastIsWithCarm := false
+						lastIsPeri := false
+						for _, line := range lines {
+							line = strings.TrimSpace(line)
+							if line == "" {
+								continue
+							}
+
+							// 날짜 정규식 "2006-01-02 " 앞부분 자르기
+							dateRe := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}\s+`)
+							line = dateRe.ReplaceAllString(line, "")
+
+							isWithCarm := false
+							isPeri := false
+							if strings.HasPrefix(line, "c) ") {
+								isWithCarm = true
+								lastIsWithCarm = true
+								lastIsPeri = false
+								line = strings.TrimPrefix(line, "c) ")
+							} else if strings.HasPrefix(line, "s) ") {
+								isPeri = true
+								lastIsPeri = true
+								lastIsWithCarm = false
+								line = strings.TrimPrefix(line, "s) ")
+							} else {
+								// c) 나 s) 가 없으면 이전 상태 따라감
+								if lastIsWithCarm {
+									isWithCarm = true
+								} else if lastIsPeri {
+									isPeri = true
+								}
+							}
+
+							// e) 나 ef) 혹은 snt) 나 pe) 로 시작하는 건 주사가 아니므로 제외
+							if strings.HasPrefix(line, "e) ") || strings.HasPrefix(line, "ef) ") || strings.HasPrefix(line, "snt) ") || strings.HasPrefix(line, "pe) ") {
+								isWithCarm = false
+								isPeri = false
+								lastIsWithCarm = false
+								lastIsPeri = false
+							}
+
+							if isWithCarm || isPeri {
+								// 끝에 " p" 나 " n" 이 있는지 확인
+								isP := false
+								if strings.HasSuffix(line, " p") {
+									isP = true
+									line = strings.TrimSuffix(line, " p")
+								}
+								isN := false
+								if strings.HasSuffix(line, " n") {
+									isN = true
+									line = strings.TrimSuffix(line, " n")
+								}
+
+								// direction 추출
+								direction := ""
+								if strings.HasPrefix(line, "both ") {
+									direction = "both"
+									line = strings.TrimPrefix(line, "both ")
+								} else if strings.HasPrefix(line, "rt ") {
+									direction = "rt"
+									line = strings.TrimPrefix(line, "rt ")
+								} else if strings.HasPrefix(line, "lt ") {
+									direction = "lt"
+									line = strings.TrimPrefix(line, "lt ")
+								}
+
+								site := line // 나머지는 site
+
+								// 매칭되는 코드를 K_Blocks에서 탐색
+								code := ""
+								for _, v := range hotstrings.K_Blocks {
+									if v.GetSite() == site {
+										code = v.GetCode()
+										break
+									}
+								}
+
+								// Injection 생성
+								inj := models.NewInjection(direction, site, code, "", "", "", isWithCarm, isP, isN, nil)
+								inj.SetIsFromClipboard(true)
+								c.treatments.SetAddInjection(*inj)
+							} else {
+								// Injection 형태가 아닌 다른 부분 (eswt 등)이라면 일단 기존처럼 메모로 추가
+								c.treatments.AddClipboardMemo(line)
+							}
+						}
+
+						fmt.Printf("📋 [CLIPBOARD Parsed to Treatments] '%s'\n", text)
+						os.Stdout.Sync()
+					}
+					continue
+				}
+
 				// Backspace message processing
 				if stuff.Do == "Backspace" {
 					if len(c.buffer) > 0 {

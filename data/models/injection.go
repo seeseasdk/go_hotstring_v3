@@ -3,30 +3,32 @@ package models
 import "fmt"
 
 type Injection struct {
-	direction  string
-	site       string
-	code       string
-	eswtFocus  string
-	eswtRadial string
-	sonoStim   string
-	isWithCarm bool
-	isP        bool
-	isN        bool
-	etc        any
+	direction       string
+	site            string
+	code            string
+	eswtFocus       string
+	eswtRadial      string
+	sonoStim        string
+	isWithCarm      bool
+	isP             bool
+	isN             bool
+	isFromClipboard bool
+	etc             any
 }
 
 func NewInjection(direction, site, code, eswtFocus, eswtRadial, sonoStim string, isWithCarm, isP, isN bool, etc any) *Injection {
 	return &Injection{
-		direction:  direction,
-		site:       site,
-		code:       code,
-		eswtFocus:  eswtFocus,
-		eswtRadial: eswtRadial,
-		sonoStim:   sonoStim,
-		isWithCarm: isWithCarm,
-		isP:        isP,
-		isN:        isN,
-		etc:        etc,
+		direction:       direction,
+		site:            site,
+		code:            code,
+		eswtFocus:       eswtFocus,
+		eswtRadial:      eswtRadial,
+		sonoStim:        sonoStim,
+		isWithCarm:      isWithCarm,
+		isP:             isP,
+		isN:             isN,
+		isFromClipboard: false,
+		etc:             etc,
 	}
 }
 
@@ -57,6 +59,9 @@ func (i *Injection) GetIsP() bool {
 func (i *Injection) GetIsN() bool {
 	return i.isN
 }
+func (i *Injection) GetIsFromClipboard() bool {
+	return i.isFromClipboard
+}
 func (i *Injection) GetEtc() any {
 	return i.etc
 }
@@ -86,6 +91,9 @@ func (i *Injection) SetIsP(isP bool) {
 }
 func (i *Injection) SetIsN(isN bool) {
 	i.isN = isN
+}
+func (i *Injection) SetIsFromClipboard(isFromClipboard bool) {
+	i.isFromClipboard = isFromClipboard
 }
 func (i *Injection) SetEtc(etc any) {
 	i.etc = etc

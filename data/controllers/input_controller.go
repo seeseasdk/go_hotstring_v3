@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
-	"github.com/eiannone/keyboard"
+	"github.com/go-vgo/robotgo"
+	hook "github.com/robotn/gohook"
 
+	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
 
@@ -21,68 +24,156 @@ func NewInputController(cc *ChannelController) *InputController {
 }
 
 func (c *InputController) Start() {
-	slog.Info("InputController started. Listening for input...")
+	slog.Info("InputController started. Listening for global input...")
 	fmt.Println("💡 [TIP] Ctrl+Enter to flush, Ctrl+C or ESC to exit")
 	os.Stdout.Sync()
 
-	// 키보드 초기화
-	if err := keyboard.Open(); err != nil {
-		panic(err)
-	}
-	defer keyboard.Close()
+	// 글로벌 키보드 훅 시작
+	EvChan := hook.Start()
+	defer hook.End()
 
-	// 키보드 입력 대기
-	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			fmt.Printf("Keyboard input error: %v\n", err)
-			continue
-		}
+	ctrlPressed := false
+	shiftPressed := false
 
-		// Exit conditions: ESC or Ctrl+C
-		if key == keyboard.KeyEsc || key == keyboard.KeyCtrlC {
-			fmt.Println("🚪 [EXIT] Program terminating")
-			os.Stdout.Sync()
-			os.Exit(0)
-		}
+	// 이벤트 대기 루프
+	for ev := range EvChan {
+		if ev.Kind == hook.KeyDown {
+			// Ctrl 키 상태 확인 (VK_CONTROL=17, VK_LCONTROL=162, VK_RCONTROL=163)
+			if ev.Rawcode == 17 || ev.Rawcode == 162 || ev.Rawcode == 163 {
+				ctrlPressed = true
+				continue
+			}
 
-		if key == keyboard.KeyBackspace || key == keyboard.KeyBackspace2 {
-			c.cc.InputChan <- models.NewChannelStuff(
-				"InputController",
-				"HotstringController",
-				"Backspace",
-				false,
-				nil,
-			)
-			continue
-		}
+			// Shift 키 상태 확인 (VK_SHIFT=16, VK_LSHIFT=160, VK_RSHIFT=161)
+			if ev.Rawcode == 16 || ev.Rawcode == 160 || ev.Rawcode == 161 {
+				shiftPressed = true
+				continue
+			}
 
-		// Ctrl+Enter trigger (Enter key assumed to be with Ctrl)
-		if key == keyboard.KeyEnter {
-			fmt.Println("🚀 [CTRL+ENTER] Triggered!")
-			os.Stdout.Sync()
-			c.cc.InputChan <- models.NewChannelStuff(
-				"InputController",
-				"HotstringController",
-				"FlushTreatments",
-				true,
-				nil,
-			)
-			continue
-		}
+			// ESC 종료 (VK_ESCAPE=27)
+			if ev.Rawcode == 27 {
+				fmt.Println("🚪 [EXIT] Program terminating")
+				os.Stdout.Sync()
+				os.Exit(0)
+			}
 
-		// 일반 문자 입력 처리 (hotstring 패턴 매칭용)
-		if char != 0 {
-			// 문자를 HotstringController로 전송
-			c.cc.InputChan <- models.NewChannelStuff(
-				"InputController",
-				"HotstringController",
-				"AddChar",
-				false,
-				map[string]interface{}{
-					"char": char,
-				},
-			)
+			// Ctrl + - 액션 (pacsButton 클릭)
+			// Windows에서 대시키(VK_OEM_MINUS)는 189, 텐키패드 마이너스(VK_SUBTRACT)는 109
+			if ctrlPressed && (ev.Rawcode == 189 || ev.Rawcode == 109) {
+				fmt.Println("👆 [CTRL+-] PACS Button Clicked!")
+				if coord, exists := hotstrings.K_Coordinates["pacsButton"]; exists {
+					robotgo.Move(coord.X, coord.Y)
+					robotgo.Click("left")
+				}
+				continue
+			}
+
+			// Ctrl + + 액션 (completeButton 클릭)
+			// Windows에서 플러스키(VK_OEM_PLUS)는 187, 텐키패드 플러스(VK_ADD)는 107
+			if ctrlPressed && (ev.Rawcode == 187 || ev.Rawcode == 107) {
+				fmt.Println("👆 [CTRL++] Complete Button Clicked!")
+				if coord, exists := hotstrings.K_Coordinates["completeButton"]; exists {
+					robotgo.Move(coord.X, coord.Y)
+					robotgo.Click("left")
+				}
+				continue
+			}
+
+			// Ctrl + * 액션 (선택영역 복사 후 specificText로 입력)
+			// 텐키패드 별표(VK_MULTIPLY)=106, 메인키보드 별표(Shift+8)=56
+			if ctrlPressed && (ev.Rawcode == 106 || (shiftPressed && ev.Rawcode == 56)) {
+				fmt.Println("👆 [CTRL+*] Copying and pasting as treatment!")
+
+				go func() {
+					// 1. Ctrl + C 입력해서 클립보드로 복사
+					robotgo.KeyTap("c", "ctrl")
+					time.Sleep(100 * time.Millisecond) // 클립보드에 담길 시간 대기
+
+					// 2. 클립보드 텍스트 읽기
+					text, err := robotgo.ReadAll()
+					if err == nil && text != "" {
+						// 3. 바로 전송하지 않고 HotstringController의 트리트먼트에 복사 내용 추가 명령
+						c.cc.InputChan <- models.NewChannelStuff(
+							"InputController",
+							"HotstringController",
+							"AddClipboardMemo",
+							true,
+							text,
+						)
+
+						// 4. 추가된 후 곧바로 출력을 원하므로 Flush명령도 전송
+						time.Sleep(50 * time.Millisecond)
+						c.cc.InputChan <- models.NewChannelStuff(
+							"InputController",
+							"HotstringController",
+							"FlushTreatments",
+							true,
+							nil,
+						)
+					}
+				}()
+				continue
+			}
+
+			// Ctrl + Enter (트리거) (VK_RETURN=13)
+			if ctrlPressed && ev.Rawcode == 13 {
+				fmt.Println("🚀 [CTRL+ENTER] Triggered!")
+				os.Stdout.Sync()
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"FlushTreatments",
+					true,
+					nil,
+				)
+				continue
+			}
+
+			// 백스페이스 (VK_BACK=8, 삭제키 VK_DELETE=46)
+			if ev.Rawcode == 8 || ev.Rawcode == 46 {
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"Backspace",
+					false,
+					nil,
+				)
+				continue
+			}
+
+			// 일반 문자 입력 처리 (핫스트링 패턴 매칭용)
+			if !ctrlPressed {
+				var charRune rune = 0
+
+				// A-Z (Rawcode 65-90) -> 소문자로 변환
+				if ev.Rawcode >= 65 && ev.Rawcode <= 90 {
+					charRune = rune(ev.Rawcode + 32)
+				} else if ev.Rawcode >= 48 && ev.Rawcode <= 57 {
+					// 숫자 0-9 (Rawcode 48-57)
+					charRune = rune(ev.Rawcode)
+				} else if ev.Rawcode >= 96 && ev.Rawcode <= 105 {
+					// 넘패드 숫자 0-9 (Rawcode 96-105)
+					charRune = rune(ev.Rawcode - 96 + 48)
+				}
+
+				if charRune != 0 {
+					c.cc.InputChan <- models.NewChannelStuff(
+						"InputController",
+						"HotstringController",
+						"AddChar",
+						false,
+						map[string]interface{}{
+							"char": charRune,
+						},
+					)
+				}
+			}
+
+		} else if ev.Kind == hook.KeyUp {
+			// Ctrl 키 떼면 상태 원복
+			if ev.Rawcode == 17 || ev.Rawcode == 162 || ev.Rawcode == 163 {
+				ctrlPressed = false
+			}
 		}
 	}
 }
