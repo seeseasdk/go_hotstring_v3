@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/go-vgo/robotgo"
@@ -36,10 +37,18 @@ func (c *OutputController) Start() {
 
 				// 방금 입력한 트리거 문자열 길이만큼 백스페이스 눌러서 지우기
 				if deleteSpace := output.GetDeleteHostring(); deleteSpace > 0 {
+					fmt.Printf("🛠  [DEBUG-BACKSPACE] Will tap backspace %d times to delete hostring.\n", deleteSpace)
+
+					// Ctrl 키가 물리적으로 눌려있어 Ctrl+Backspace(단어 단위 지우기)가 발생하는 것을 막기 위해 강제 해제
+					robotgo.KeyToggle("ctrl", "up")
+					time.Sleep(10 * time.Millisecond)
+
 					for i := 0; i < deleteSpace; i++ {
+						fmt.Printf("   -> Tapping backspace (%d/%d)\n", i+1, deleteSpace)
 						robotgo.KeyTap("backspace")
-						time.Sleep(10 * time.Millisecond) // 백스페이스 연속 입력간 아주 짧은 딜레이
+						time.Sleep(10 * time.Millisecond) // 백스페이스 연속 입력간 아주 짧은 딜레이 (원상복구)
 					}
+					fmt.Printf("🛠  [DEBUG-BACKSPACE] Finished tapping backspace %d times.\n", deleteSpace)
 					time.Sleep(50 * time.Millisecond) // 다 지우고 약간 대기
 				}
 
@@ -86,10 +95,22 @@ func (c *OutputController) Start() {
 						time.Sleep(50 * time.Millisecond)
 
 						for _, code := range orderCodes {
-							robotgo.TypeStr(code)
-							time.Sleep(500 * time.Millisecond)
-							robotgo.KeyTap("enter")
-							time.Sleep(500 * time.Millisecond)
+							if strings.Contains(code, "#") {
+								parts := strings.Split(code, "#")
+								robotgo.TypeStr(parts[0])
+								time.Sleep(500 * time.Millisecond)
+								robotgo.KeyTap("enter")
+								time.Sleep(500 * time.Millisecond)
+								robotgo.TypeStr(parts[1])
+								time.Sleep(500 * time.Millisecond)
+								robotgo.KeyTap("enter")
+								time.Sleep(500 * time.Millisecond)
+							} else {
+								robotgo.TypeStr(code)
+								time.Sleep(500 * time.Millisecond)
+								robotgo.KeyTap("enter")
+								time.Sleep(500 * time.Millisecond)
+							}
 						}
 						time.Sleep(50 * time.Millisecond)
 					}

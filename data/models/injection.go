@@ -3,6 +3,7 @@ package models
 import "fmt"
 
 type Injection struct {
+	mx999           string
 	direction       string
 	site            string
 	code            string
@@ -41,6 +42,9 @@ func (i *Injection) GetSite() string {
 func (i *Injection) GetCode() string {
 	return i.code
 }
+func (i *Injection) GetMx999() string {
+	return i.mx999
+}
 func (i *Injection) GetEswtFocus() string {
 	return i.eswtFocus
 }
@@ -74,6 +78,9 @@ func (i *Injection) SetSite(site string) {
 func (i *Injection) SetCode(code string) {
 	i.code = code
 }
+func (i *Injection) SetMx999(mx999 string) {
+	i.mx999 = mx999
+}
 func (i *Injection) SetEswtFocus(eswtFocus string) {
 	i.eswtFocus = eswtFocus
 }
@@ -99,7 +106,7 @@ func (i *Injection) SetEtc(etc any) {
 	i.etc = etc
 }
 func (i *Injection) ToString() string {
-	return "Direction: " + i.direction + " Site: " + i.site + " Code: " + i.code +
+	return "Direction: " + i.direction + " Site: " + i.site + " Code: " + i.code + " Mx999: " + i.mx999 +
 		" EswtFocus: " + i.eswtFocus + " EswtRadial: " + i.eswtRadial + " SonoStim: " + i.sonoStim +
 		" IsWithCarm: " + fmt.Sprint(i.isWithCarm) + " IsP: " + fmt.Sprint(i.isP) + " IsN: " + fmt.Sprint(i.isN) +
 		" Etc: " + fmt.Sprint(i.etc)

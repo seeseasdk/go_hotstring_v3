@@ -122,35 +122,50 @@ func (c *HotstringController) Start() {
 
 								// direction 추출
 								direction := ""
-								if strings.HasPrefix(line, "both ") {
-									direction = "both"
-									line = strings.TrimPrefix(line, "both ")
-								} else if strings.HasPrefix(line, "rt ") {
-									direction = "rt"
-									line = strings.TrimPrefix(line, "rt ")
-								} else if strings.HasPrefix(line, "lt ") {
-									direction = "lt"
-									line = strings.TrimPrefix(line, "lt ")
+								lowerLine := strings.ToLower(line)
+								if strings.HasPrefix(lowerLine, "both ") {
+									direction = "Both"
+									line = line[5:]
+								} else if strings.HasPrefix(lowerLine, "rt. ") {
+									direction = "Rt."
+									line = line[4:]
+								} else if strings.HasPrefix(lowerLine, "rt ") {
+									direction = "Rt."
+									line = line[3:]
+								} else if strings.HasPrefix(lowerLine, "lt. ") {
+									direction = "Lt."
+									line = line[4:]
+								} else if strings.HasPrefix(lowerLine, "lt ") {
+									direction = "Lt."
+									line = line[3:]
 								}
+								line = strings.TrimSpace(line)
 
 								site := line // 나머지는 site
 
-								// 매칭되는 코드를 K_Blocks에서 탐색
+								// 매칭되는 코드를 K_Blocks에서 검색
 								code := ""
+								mx999 := site
 								for _, v := range hotstrings.K_Blocks {
 									if v.GetSite() == site {
 										code = v.GetCode()
+										mx999 = v.GetMx999()
 										break
 									}
 								}
 
 								// Injection 생성
 								inj := models.NewInjection(direction, site, code, "", "", "", isWithCarm, isP, isN, nil)
+								inj.SetMx999(mx999)
 								inj.SetIsFromClipboard(true)
 								c.treatments.SetAddInjection(*inj)
 							} else {
-								// Injection 형태가 아닌 다른 부분 (eswt 등)이라면 일단 기존처럼 메모로 추가
-								c.treatments.AddClipboardMemo(line)
+								// Injection 형태가 아닌 다른 부분(eswt 등)이라면 일단 기존처럼 메모로 추가
+								if strings.HasPrefix(line, "radial on") {
+									c.treatments.AddClipboardMemo("    " + line)
+								} else {
+									c.treatments.AddClipboardMemo(line)
+								}
 							}
 						}
 

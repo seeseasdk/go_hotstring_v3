@@ -124,11 +124,37 @@ func (c *InputController) Start() {
 					"HotstringController",
 					"FlushTreatments",
 					true,
+					"CtrlEnter",
+				)
+				continue
+			}
+			// 일반 Enter (VK_RETURN=13) - buffer 초기화
+			if !ctrlPressed && ev.Rawcode == 13 {
+				fmt.Println("🔄 [ENTER] Buffer cleared!")
+				os.Stdout.Sync()
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"ClearBuffer",
+					false,
 					nil,
 				)
 				continue
 			}
 
+			// Space (VK_SPACE=32) - buffer 초기화
+			if ev.Rawcode == 32 {
+				fmt.Println("🔄 [SPACE] Buffer cleared!")
+				os.Stdout.Sync()
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"ClearBuffer",
+					false,
+					nil,
+				)
+				continue
+			}
 			// 백스페이스 (VK_BACK=8, 삭제키 VK_DELETE=46)
 			if ev.Rawcode == 8 || ev.Rawcode == 46 {
 				c.cc.InputChan <- models.NewChannelStuff(
