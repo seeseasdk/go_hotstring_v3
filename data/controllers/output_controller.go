@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-vgo/robotgo"
+	"github.com/seeseasdk/go_hotstring_v3/data/constants"
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
@@ -142,6 +143,24 @@ func (c *OutputController) Start() {
 					// 윈도우 클릭 없이 바로 입력
 					robotgo.TypeStr(simpleText)
 					time.Sleep(50 * time.Millisecond)
+
+					// ExtraDo가 same_input_memo_window이면 memoWindow에도 동일 입력 후 chartWindow로 복귀
+					if output.GetExtraDo() == constants.K_SAME_INPUT_MEMO_WINDOW {
+						if coord, exists := hotstrings.K_Coordinates["memoWindow"]; exists {
+							time.Sleep(50 * time.Millisecond)
+							robotgo.Move(coord.X, coord.Y)
+							robotgo.Click("left")
+							time.Sleep(50 * time.Millisecond)
+							robotgo.TypeStr(simpleText)
+							time.Sleep(50 * time.Millisecond)
+						}
+						if coord, exists := hotstrings.K_Coordinates["chartWindow"]; exists {
+							time.Sleep(50 * time.Millisecond)
+							robotgo.Move(coord.X, coord.Y)
+							robotgo.Click("left")
+							time.Sleep(50 * time.Millisecond)
+						}
+					}
 				}
 
 				// Send reset signal to clear

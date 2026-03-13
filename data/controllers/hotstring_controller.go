@@ -377,9 +377,10 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 	// 겹치지 않는 매치들을 순서대로 처리
 	processed := make(map[int]bool)
-	output := models.NewOutputStuff(len(c.buffer), "", "", "", []string{}, "", "", "")
+	output := models.NewOutputStuff(len(c.buffer)+1, "", "", "", []string{}, "", "", "")
 
 	var combinedFirstMeeting *models.FirstMeeting
+	hasBlocksMatch := false
 
 	for _, match := range matches {
 		// 이미 처리된 부분과 겹치는지 확인
@@ -500,6 +501,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				injection := match.value.(*models.Injection)
 				slog.Debug("Hotstring Triggered (Blocks)", "trigger", match.key, "site", injection.GetSite())
 				c.treatments.SetAddInjection(*injection)
+				hasBlocksMatch = true
 			case "Simples":
 				slog.Debug("Hotstring Triggered (Simples)", "trigger", match.key)
 				simple, ok := match.value.(*models.SimpleInput)
@@ -524,23 +526,26 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 		}
 	}
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
+	// Blocks 매치가 있을 때만 실행 (simple 입력만 있을 때 불필요한 caudal/isP 트리거 방지)
 	leftoverP := false
-	for i := 0; i < len(c.buffer); i++ {
-		if !processed[i] {
-			if c.buffer[i] == 'c' {
-				if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
-					slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
-					c.treatments.SetAddInjection(*caudalVal)
+	if hasBlocksMatch {
+		for i := 0; i < len(c.buffer); i++ {
+			if !processed[i] {
+				if c.buffer[i] == 'c' {
+					if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
+						slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
+						c.treatments.SetAddInjection(*caudalVal)
+						processed[i] = true
+					}
+				} else if c.buffer[i] == 'p' {
+					slog.Debug("Hotstring Triggered (Leftover 'p' -> isP=true)")
+					leftoverP = true
+					processed[i] = true
+				} else if c.buffer[i] == '7' {
+					slog.Debug("Hotstring Triggered (Leftover '7' -> hasSeven=true)")
+					c.treatments.SetHasSeven(true)
 					processed[i] = true
 				}
-			} else if c.buffer[i] == 'p' {
-				slog.Debug("Hotstring Triggered (Leftover 'p' -> isP=true)")
-				leftoverP = true
-				processed[i] = true
-			} else if c.buffer[i] == '7' {
-				slog.Debug("Hotstring Triggered (Leftover '7' -> hasSeven=true)")
-				c.treatments.SetHasSeven(true)
-				processed[i] = true
 			}
 		}
 	}

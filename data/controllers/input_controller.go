@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/go-vgo/robotgo"
 	hook "github.com/robotn/gohook"
@@ -12,6 +15,59 @@ import (
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
+
+var (
+	user32                       = syscall.NewLazyDLL("user32.dll")
+	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
+	procGetForegroundWindow      = user32.NewProc("GetForegroundWindow")
+	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
+	procOpenProcess              = kernel32.NewProc("OpenProcess")
+	procQueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
+	procCloseHandle              = kernel32.NewProc("CloseHandle")
+)
+
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+func getForegroundExeName() string {
+	hwnd, _, _ := procGetForegroundWindow.Call()
+	if hwnd == 0 {
+		return ""
+	}
+	var pid uint32
+	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	if pid == 0 {
+		return ""
+	}
+	handle, _, _ := procOpenProcess.Call(PROCESS_QUERY_LIMITED_INFORMATION, 0, uintptr(pid))
+	if handle == 0 {
+		return ""
+	}
+	defer procCloseHandle.Call(handle)
+
+	buf := make([]uint16, 260)
+	size := uint32(len(buf))
+	procQueryFullProcessImageName.Call(handle, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+	fullPath := syscall.UTF16ToString(buf[:size])
+
+	// 경로에서 파일명만 추출
+	idx := strings.LastIndexAny(fullPath, `\/`)
+	if idx >= 0 {
+		return fullPath[idx+1:]
+	}
+	return fullPath
+}
+
+var activatedWindows = []string{"FForm.exe", "FwChart.exe"}
+
+func isActivatedWindow() bool {
+	exeName := getForegroundExeName()
+	for _, w := range activatedWindows {
+		if strings.EqualFold(exeName, w) {
+			return true
+		}
+	}
+	return false
+}
 
 type InputController struct {
 	cc *ChannelController
@@ -55,6 +111,11 @@ func (c *InputController) Start() {
 				fmt.Println("🚪 [EXIT] Program terminating")
 				os.Stdout.Sync()
 				os.Exit(0)
+			}
+
+			// 활성화된 창에서만 동작하도록 체크
+			if !isActivatedWindow() {
+				continue
 			}
 
 			// Ctrl + - 액션 (pacsButton 클릭)
@@ -143,7 +204,7 @@ func (c *InputController) Start() {
 			}
 
 			// Space (VK_SPACE=32) - buffer 초기화
-			if ev.Rawcode == 32 {
+			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 40) || ev.Rawcode == 46 {
 				fmt.Println("🔄 [SPACE] Buffer cleared!")
 				os.Stdout.Sync()
 				c.cc.InputChan <- models.NewChannelStuff(
@@ -156,7 +217,7 @@ func (c *InputController) Start() {
 				continue
 			}
 			// 백스페이스 (VK_BACK=8, 삭제키 VK_DELETE=46)
-			if ev.Rawcode == 8 || ev.Rawcode == 46 {
+			if ev.Rawcode == 8 {
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",

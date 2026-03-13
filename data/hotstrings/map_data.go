@@ -159,9 +159,9 @@ var K_Blocks = map[string]*models.Injection{
 	"knb":   models.NewInjection(constants.K_BOTH, "knee IA", constants.K_F1, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", true, false, false, nil),
 	"knr":   models.NewInjection(constants.K_RT, "knee IA", constants.K_F05, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", true, false, false, nil),
 	"knl":   models.NewInjection(constants.K_LT, "knee IA", constants.K_F05, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", true, false, false, nil),
-	"pknb":  models.NewInjection(constants.K_BOTH, "knee IA", constants.K_PKNB, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
-	"pknr":  models.NewInjection(constants.K_RT, "knee IA", constants.K_PKN, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
-	"pknl":  models.NewInjection(constants.K_LT, "knee IA", constants.K_PKN, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
+	"pknb":  models.NewInjection(constants.K_BOTH, "knee IA", constants.K_PKNB, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, models.NewInjection(constants.K_BOTH, "mcl/lcl", constants.K_SCB, "ant. thigh", "ant. thigh", "ant. thigh", false, false, false, nil)),
+	"pknr":  models.NewInjection(constants.K_RT, "knee IA", constants.K_PKN, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, models.NewInjection(constants.K_RT, "mcl/lcl", constants.K_SC, "ant. thigh", "ant. thigh", "ant. thigh", false, false, false, nil)),
+	"pknl":  models.NewInjection(constants.K_LT, "knee IA", constants.K_PKN, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, models.NewInjection(constants.K_LT, "mcl/lcl", constants.K_SC, "ant. thigh", "ant. thigh", "ant. thigh", false, false, false, nil)),
 	"khb":   models.NewInjection(constants.K_BOTH, "아라간", constants.K_PKHB, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
 	"khr":   models.NewInjection(constants.K_RT, "아라간", constants.K_PKH, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
 	"khl":   models.NewInjection(constants.K_LT, "아라간", constants.K_PKH, "knee", "ant. thigh (rectus femoris m.)", "ant. thigh (rectus femoris m.)", false, false, false, nil),
@@ -528,7 +528,8 @@ var K_Simples = map[string]*models.SimpleInput{
 }
 
 var K_SIMPLE_CODE = map[string]string{
-	"pt0":    ".+999_pf",
+	"pf":     ".+999_pf",
+	"pt0":    ".+999_pt0",
 	"pt1":    ".+999_pt1",
 	"pt2":    ".+999_pt2",
 	"pt3":    ".+999_pt3",

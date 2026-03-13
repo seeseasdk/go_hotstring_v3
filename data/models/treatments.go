@@ -265,6 +265,11 @@ func (i Treatments) GetTextForChart() string {
 			}
 		}
 	}
+
+	if text == "" {
+		return ""
+	}
+
 	if i.followUp == "" {
 		if strings.Contains(periTreat, "hyaluron") {
 			return text + "f/u) " + i.getFollowUpDate(7) + "\n"
@@ -591,14 +596,18 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		result = append(result, injectCode)
 	}
 
+	// c타입 (isWithCarm=true) 치료가 있으면 .+999_pt0 추가
+	for _, inject := range injections {
+		if inject.isWithCarm {
+			result = append(result, ".+999_pt0")
+			break
+		}
+	}
+
 	for _, extra := range i.extraTreatments {
 		switch extra := extra.(type) {
 		case string:
 			switch extra {
-			case "자기장":
-				result = append(result, constants.K_MAGNETIC)
-			case "도수프리":
-				result = append(result, constants.K_MANUAL_FREE)
 			case constants.K_PT:
 				result = append(result, constants.K_NORMAL_PT)
 			default:
