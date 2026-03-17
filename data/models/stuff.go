@@ -110,9 +110,9 @@ func (os *OutputStuff) GetDrugCode() string {
 	return os.drugCode
 }
 
-// func (os *OutputStuff) SetFollowUp(followUp string) {
-// 	os.followUp = followUp
-// }
+//	func (os *OutputStuff) SetFollowUp(followUp string) {
+//		os.followUp = followUp
+//	}
 func (os *OutputStuff) SetExtraDo(extraDo string) {
 	os.extraDo = extraDo
 }
@@ -153,9 +153,9 @@ func (os *OutputStuff) GetDrug() string {
 	return os.drug
 }
 
-// func (os *OutputStuff) GetFollowUp() string {
-// 	return os.followUp
-// }
+//	func (os *OutputStuff) GetFollowUp() string {
+//		return os.followUp
+//	}
 func (os *OutputStuff) GetExtraDo() string {
 	return os.extraDo
 }

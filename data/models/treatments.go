@@ -205,6 +205,7 @@ func (i Treatments) buildFollowUpLine(text string) string {
 		return text + "f/u) " + i.getFollowUpDate(day) + "\n"
 	}
 }
+
 // HasOnlyFollowUp 은 f/u 값만 있고 injection/eSWT/extraTreatments가 모두 없는 경우 true를 반환한다.
 func (i Treatments) HasOnlyFollowUp() bool {
 	if i.followUp == "" {
