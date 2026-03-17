@@ -17,13 +17,13 @@ import (
 )
 
 var (
-	user32                       = syscall.NewLazyDLL("user32.dll")
-	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
-	procGetForegroundWindow      = user32.NewProc("GetForegroundWindow")
-	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
-	procOpenProcess              = kernel32.NewProc("OpenProcess")
+	user32                        = syscall.NewLazyDLL("user32.dll")
+	kernel32                      = syscall.NewLazyDLL("kernel32.dll")
+	procGetForegroundWindow       = user32.NewProc("GetForegroundWindow")
+	procGetWindowThreadProcessId  = user32.NewProc("GetWindowThreadProcessId")
+	procOpenProcess               = kernel32.NewProc("OpenProcess")
 	procQueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
-	procCloseHandle              = kernel32.NewProc("CloseHandle")
+	procCloseHandle               = kernel32.NewProc("CloseHandle")
 )
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
