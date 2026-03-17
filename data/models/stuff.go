@@ -47,7 +47,8 @@ type OutputStuff struct {
 	orderCode      []string
 	memoText       string
 	simpleText     string // 윈도우 상관없이 커서에 단순한 텍스트를 입력할 때 사용
-	drug           string // 약 날짜
+	drug           string // 약 날짜 (일수)
+	drugCode       string // 약 주문 코드 (.+51 등)
 	// followUp       string // 추적관찰 날짜
 	extraDo string // 추가적인 동작을 수행할 때 사용
 }
@@ -102,6 +103,12 @@ func (os *OutputStuff) SetSimpleText(simpleText string) {
 func (os *OutputStuff) SetDrug(drug string) {
 	os.drug = drug
 }
+func (os *OutputStuff) SetDrugCode(drugCode string) {
+	os.drugCode = drugCode
+}
+func (os *OutputStuff) GetDrugCode() string {
+	return os.drugCode
+}
 
 // func (os *OutputStuff) SetFollowUp(followUp string) {
 // 	os.followUp = followUp
@@ -118,6 +125,7 @@ func (os *OutputStuff) SetReset() {
 	os.memoText = ""
 	os.simpleText = ""
 	os.drug = ""
+	os.drugCode = ""
 	// os.followUp = ""
 }
 func (os *OutputStuff) GetDeleteHostring() int {
@@ -160,6 +168,7 @@ func (os *OutputStuff) IsEmpty() bool {
 		os.memoText == "" &&
 		os.simpleText == "" &&
 		os.drug == "" &&
+		os.drugCode == "" &&
 		// os.followUp == "" &&
 		os.extraDo == "" {
 		return true
@@ -174,6 +183,7 @@ func (os *OutputStuff) IsEmptyWithoutDeleteHotstring() bool {
 		os.memoText == "" &&
 		os.simpleText == "" &&
 		os.drug == "" &&
+		os.drugCode == "" &&
 		// os.followUp == "" &&
 		os.extraDo == "" {
 		return true
@@ -192,7 +202,7 @@ func (os *OutputStuff) ToString() string {
 		"OrderCode: " + orderCode + "\n" +
 		"MemoText: " + os.memoText + "\n" +
 		"SimpleText: " + os.simpleText + "\n" +
-		"Drug: " + os.drug + "\n" +
+		"Drug: " + os.drug + " (code: " + os.drugCode + ")" + "\n" +
 		// "FollowUp: " + os.followUp + "\n" +
 		"ExtraDo: " + os.extraDo + "\n"
 }

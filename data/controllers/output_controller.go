@@ -60,6 +60,9 @@ func (c *OutputController) Start() {
 						robotgo.Click("left")
 						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
 
+						robotgo.KeyTap("end", "ctrl") // Ctrl + End 입력
+						time.Sleep(50 * time.Millisecond)
+
 						// 키보드 입력을 통해 글자 입력 (로봇고 사용)
 						robotgo.TypeStr(chartText)
 						time.Sleep(50 * time.Millisecond)
@@ -81,12 +84,15 @@ func (c *OutputController) Start() {
 					}
 				}
 
-				if orderCodes := output.GetOrderCode(); len(orderCodes) > 0 {
+				drugCode := output.GetDrugCode()
+				drugDays := output.GetDrug()
+				orderCodes := output.GetOrderCode()
+				if drugCode != "" || len(orderCodes) > 0 {
 					if coord, exists := hotstrings.K_Coordinates["orderWindow"]; exists {
-						time.Sleep(50 * time.Millisecond) // 창 이동 전 딜레이 추가
+						time.Sleep(50 * time.Millisecond)
 						robotgo.Move(coord.X, coord.Y)
 						robotgo.Click("left")
-						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
+						time.Sleep(50 * time.Millisecond)
 
 						// 먼저 Down 키 20번 입력
 						for i := 0; i < 20; i++ {
@@ -95,6 +101,19 @@ func (c *OutputController) Start() {
 						}
 						time.Sleep(50 * time.Millisecond)
 
+						// 약 코드: 코드 입력 → 딜레이 → 일수 입력 → Enter
+						if drugCode != "" {
+							robotgo.TypeStr(drugCode)
+							time.Sleep(500 * time.Millisecond)
+							if drugDays != "" {
+								robotgo.TypeStr(drugDays)
+								time.Sleep(500 * time.Millisecond)
+							}
+							robotgo.KeyTap("enter")
+							time.Sleep(500 * time.Millisecond)
+						}
+
+						// 나머지 일반 주문 코드
 						for _, code := range orderCodes {
 							if strings.Contains(code, "#") {
 								parts := strings.Split(code, "#")

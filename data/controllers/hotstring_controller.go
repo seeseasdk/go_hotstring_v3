@@ -36,8 +36,14 @@ func (c *HotstringController) Start() {
 					fmt.Printf("🚀 [FLUSH] Processing buffer: '%s'\n", c.buffer)
 					os.Stdout.Sync()
 
+					// Ctrl+* 트리거는 클립보드 기반이므로 deleteHostring = 0
+					isClipboard := stuff.Object == nil
+
+					// 트리거 시점의 버퍼 내용을 디버그 로그에 기록
+					slog.Debug("HotstringController: Triggered", "buffer", c.buffer)
+
 					// Trigger processing of the accumulated buffer
-					output := c.processBuffer()
+					output := c.processBuffer(isClipboard)
 
 					// Then output
 					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateOutput", true, output)
@@ -199,7 +205,7 @@ func (c *HotstringController) Start() {
 }
 
 // processBuffer scans the buffer and extracts matches sequentially by position
-func (c *HotstringController) processBuffer() *models.OutputStuff {
+func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuff {
 	// 모든 가능한 매치를 찾아서 위치별로 정렬
 	type Match struct {
 		position int
@@ -235,20 +241,6 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			baseKey:  prefix,
 			value:    numStr,
 		})
-	}
-
-	// 1. K_Simples 매치 찾기 (최우선: 모든 모드보다 먼저 검사)
-	for k, v := range hotstrings.K_Simples {
-		if idx := strings.Index(c.buffer, k); idx != -1 {
-			matches = append(matches, Match{idx, len(k), "Simples", k, k, v})
-		}
-	}
-
-	// 2. K_SIMPLE_CODE 매치 찾기 (최우선: 모든 모드보다 먼저 검사)
-	for k, v := range hotstrings.K_SIMPLE_CODE {
-		if idx := strings.Index(c.buffer, k); idx != -1 {
-			matches = append(matches, Match{idx, len(k), "SimpleCode", k, k, v})
-		}
 	}
 
 	isFirstMeetingMode := strings.HasPrefix(c.buffer, "z")
@@ -305,6 +297,21 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			}
 		}
 	} else {
+		// 일반 모드: K_Simples, K_SIMPLE_CODE, 모든 다른 맵 검색
+		// 1. K_Simples 매치 찾기
+		for k, v := range hotstrings.K_Simples {
+			if idx := strings.Index(c.buffer, k); idx != -1 {
+				matches = append(matches, Match{idx, len(k), "Simples", k, k, v})
+			}
+		}
+
+		// 2. K_SIMPLE_CODE 매치 찾기
+		for k, v := range hotstrings.K_SIMPLE_CODE {
+			if idx := strings.Index(c.buffer, k); idx != -1 {
+				matches = append(matches, Match{idx, len(k), "SimpleCode", k, k, v})
+			}
+		}
+
 		// 3. K_ESWT_ONLY (Prefix 'e') 매치 찾기
 		for k, v := range hotstrings.K_ESWT_ONLY {
 			target := "e" + k
@@ -346,7 +353,6 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 		// 8. K_Blocks 프리픽스 매치 찾기 ('c', 'p')
 		for k, v := range hotstrings.K_Blocks {
-			// 관절 부위(sh, kn, ak, eb, wr)나 caudal 자체는 C-arm(c) prefix를 거의 쓰지 않으므로, c를 단독으로(caudal) 식별할 수 있게 prefix 조합에서 제외
 			isJoint := strings.HasPrefix(k, "sh") || strings.HasPrefix(k, "kn") || strings.HasPrefix(k, "ak") || strings.HasPrefix(k, "eb") || strings.HasPrefix(k, "wr") || k == "caudal"
 			if !isJoint {
 				target_c := "c" + k
@@ -359,6 +365,22 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			if idx := strings.Index(c.buffer, target_p); idx != -1 {
 				matches = append(matches, Match{idx, len(target_p), "Blocks-P", target_p, k, v})
 			}
+		}
+
+		// 9. FollowUp (f + 숫자 / ff / f6m / fc / fa)
+		followUpRegex := regexp.MustCompile(`f(6m|\d+|f|c|a|o)`)
+		fuMatches := followUpRegex.FindAllStringSubmatchIndex(c.buffer, -1)
+		for _, fm := range fuMatches {
+			fullStr := c.buffer[fm[0]:fm[1]]
+			valStr := c.buffer[fm[2]:fm[3]]
+			matches = append(matches, Match{
+				position: fm[0],
+				length:   len(fullStr),
+				category: "FollowUp",
+				key:      fullStr,
+				baseKey:  "f",
+				value:    valStr,
+			})
 		}
 	}
 
@@ -377,10 +399,19 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 
 	// 겹치지 않는 매치들을 순서대로 처리
 	processed := make(map[int]bool)
-	output := models.NewOutputStuff(len(c.buffer)+1, "", "", "", []string{}, "", "", "")
+	deleteCount := 0
+	output := models.NewOutputStuff(deleteCount, "", "", "", []string{}, "", "", "")
 
 	var combinedFirstMeeting *models.FirstMeeting
 	hasBlocksMatch := false
+	var lastBlockBaseKey string
+	var lastBlockInjection *models.Injection
+
+	// 다음 매치의 시작 위치 집합: suffix 루프에서 다음 매치를 잘못 소비하지 않도록
+	matchStartPositions := make(map[int]bool)
+	for _, m := range matches {
+		matchStartPositions[m.position] = true
+	}
 
 	for _, match := range matches {
 		// 이미 처리된 부분과 겹치는지 확인
@@ -403,6 +434,10 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 			if match.category != "Sonos" && match.category != "Xrays" && match.category != "FirstMeeting" {
 				remainderPos := match.position + match.length
 				for remainderPos < len(c.buffer) && !processed[remainderPos] {
+					// 현재 위치가 다른 매치의 시작 위치라면 이 match의 suffix 처리를 중단
+					if matchStartPositions[remainderPos] {
+						break
+					}
 					remainder := c.buffer[remainderPos:]
 					matchedSuffix := false
 
@@ -410,6 +445,13 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 						if peVal, exists := hotstrings.K_PainEraser[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (PainEraser Suffix)", "trigger", match.key+"pe", "baseKey", match.baseKey)
 							c.treatments.SetAddExtraTreatments(*peVal)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+							pe := models.NewPainEraser(inj.GetDirection(), inj.GetEswtFocus(), "pe0")
+							c.treatments.SetAddExtraTreatments(*pe)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
@@ -422,11 +464,27 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), "normal", false)
+							c.treatments.SetESWT(*eswt)
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "s") {
 						if sntVal, exists := hotstrings.K_SonoStim[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (SonoStim Suffix)", "trigger", match.key+"s", "baseKey", match.baseKey)
 							c.treatments.SetAddExtraTreatments(*sntVal)
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetSonoStim() != "" {
+							sntCode := ".+999_s"
+							if inj.GetDirection() == "Both" {
+								sntCode = ".+999_sb"
+							}
+							snt := models.NewSonoStim(inj.GetDirection(), inj.GetSonoStim(), sntCode)
+							c.treatments.SetAddExtraTreatments(*snt)
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
@@ -451,7 +509,7 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				if ok {
 					output.SetDrug(days)
 					if oc, exists := hotstrings.K_Drugs[match.baseKey]; exists {
-						output.AddOrderCode(oc)
+						output.SetDrugCode(oc)
 					}
 				}
 			case "ESWT":
@@ -501,7 +559,14 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				injection := match.value.(*models.Injection)
 				slog.Debug("Hotstring Triggered (Blocks)", "trigger", match.key, "site", injection.GetSite())
 				c.treatments.SetAddInjection(*injection)
+				// etc 필드에 추가 injection이 있으면 자동으로 함께 추가
+				if etcInj, ok := injection.GetEtc().(*models.Injection); ok {
+					slog.Debug("Hotstring Triggered (Blocks etc)", "trigger", match.key, "site", etcInj.GetSite())
+					c.treatments.SetAddInjection(*etcInj)
+				}
 				hasBlocksMatch = true
+				lastBlockBaseKey = match.baseKey
+				lastBlockInjection = injection
 			case "Simples":
 				slog.Debug("Hotstring Triggered (Simples)", "trigger", match.key)
 				simple, ok := match.value.(*models.SimpleInput)
@@ -522,6 +587,12 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				if ok {
 					output.AddOrderCode(strCode)
 				}
+			case "FollowUp":
+				slog.Debug("Hotstring Triggered (FollowUp)", "trigger", match.key, "value", match.value)
+				val, ok := match.value.(string)
+				if ok {
+					c.treatments.SetFollowUp(val)
+				}
 			}
 		}
 	}
@@ -531,7 +602,20 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 	if hasBlocksMatch {
 		for i := 0; i < len(c.buffer); i++ {
 			if !processed[i] {
-				if c.buffer[i] == 'c' {
+				// 'pe' 2글자 체크를 'p' 단독보다 먼저
+				if i+1 < len(c.buffer) && !processed[i+1] && c.buffer[i] == 'p' && c.buffer[i+1] == 'e' {
+					if lastBlockInjection != nil {
+						if peVal, exists := hotstrings.K_PainEraser[lastBlockBaseKey]; exists {
+							c.treatments.SetAddExtraTreatments(*peVal)
+						} else if lastBlockInjection.GetEswtFocus() != "" {
+							pe := models.NewPainEraser(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), "pe0")
+							c.treatments.SetAddExtraTreatments(*pe)
+						}
+					}
+					processed[i] = true
+					processed[i+1] = true
+					i++
+				} else if c.buffer[i] == 'c' {
 					if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
 						slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
 						c.treatments.SetAddInjection(*caudalVal)
@@ -544,6 +628,30 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 				} else if c.buffer[i] == '7' {
 					slog.Debug("Hotstring Triggered (Leftover '7' -> hasSeven=true)")
 					c.treatments.SetHasSeven(true)
+					processed[i] = true
+				} else if c.buffer[i] == 'e' {
+					if lastBlockInjection != nil {
+						if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
+							c.treatments.SetESWT(*eswtVal)
+						} else if lastBlockInjection.GetEswtFocus() != "" {
+							eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false)
+							c.treatments.SetESWT(*eswt)
+						}
+					}
+					processed[i] = true
+				} else if c.buffer[i] == 's' {
+					if lastBlockInjection != nil {
+						sntCode := ".+999_s"
+						if lastBlockInjection.GetDirection() == "Both" {
+							sntCode = ".+999_sb"
+						}
+						if sntVal, exists := hotstrings.K_SonoStim[lastBlockBaseKey]; exists {
+							c.treatments.SetAddExtraTreatments(*sntVal)
+						} else if lastBlockInjection.GetSonoStim() != "" {
+							snt := models.NewSonoStim(lastBlockInjection.GetDirection(), lastBlockInjection.GetSonoStim(), sntCode)
+							c.treatments.SetAddExtraTreatments(*snt)
+						}
+					}
 					processed[i] = true
 				}
 			}
@@ -578,13 +686,25 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 		// 우선순위에 맞게 정렬 (caudal, mbb 등 순서 보장)
 		c.treatments.SortInjections()
 
-		chartText := output.GetChartText()
-		newChartText := c.treatments.GetTextForChart()
-		if newChartText != "" {
-			if chartText != "" {
-				output.SetChartText(chartText + "\n" + newChartText)
+		// standalone f/u(주사·ESWT·extraTreatments 없이 followUp만 있는 경우)는
+		// chartWindow가 아닌 현재 커서 위치에 바로 입력 (simpleText)
+		if c.treatments.HasOnlyFollowUp() {
+			fuText := c.treatments.GetStandaloneFollowUpText()
+			curSimple := output.GetSimpleText()
+			if curSimple != "" {
+				output.SetSimpleText(curSimple + "\n" + fuText)
 			} else {
-				output.SetChartText(newChartText)
+				output.SetSimpleText(fuText)
+			}
+		} else {
+			chartText := output.GetChartText()
+			newChartText := c.treatments.GetTextForChart()
+			if newChartText != "" {
+				if chartText != "" {
+					output.SetChartText(chartText + "\n" + newChartText)
+				} else {
+					output.SetChartText(newChartText)
+				}
 			}
 		}
 
@@ -615,6 +735,18 @@ func (c *HotstringController) processBuffer() *models.OutputStuff {
 		if drug != "" {
 			output.SetDrug(drug)
 		}
+	}
+
+	// 매칭된 글자 수 + 트리거 키 1 = deleteCount
+	if !isClipboard {
+		deleteCount = len(processed)
+		if deleteCount > 0 {
+			deleteCount += 1 // 트리거 키
+		}
+		if deleteCount > 20 {
+			deleteCount = 20
+		}
+		output.SetDeleteHostring(deleteCount)
 	}
 
 	return output

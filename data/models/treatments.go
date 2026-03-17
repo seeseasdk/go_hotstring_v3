@@ -185,6 +185,50 @@ func (i Treatments) getFollowUpDateString(countStr string) string {
 	futureDate := i.day.AddDate(0, 0, daysToAdd)
 	return futureDate.Format("2006-01-02")
 }
+
+// buildFollowUpLine은 followUp 값에 따라 적절한 f/u 라인을 생성합니다.
+// text에 기존 차트 텍스트를 전달하면 그 뒤에 이어붙입니다.
+func (i Treatments) buildFollowUpLine(text string) string {
+	switch i.followUp {
+	case "6m":
+		return text + "f/u) " + i.getFollowUpDateString("6m") + "\n"
+	case "c":
+		return text + "f/u) 전화예약\n"
+	case "a":
+		return text + "f/u) 아프실때 재방문\n"
+	case "o":
+		return text + "f/u) 오실 수 있는 날\n"
+	default:
+		// "f" (ff 입력) → Atoi 실패 → day=0 → 요일 기반 자동 계산
+		// 숫자 문자열 → 해당 일수 후
+		day, _ := strconv.Atoi(i.followUp)
+		return text + "f/u) " + i.getFollowUpDate(day) + "\n"
+	}
+}
+// HasOnlyFollowUp 은 f/u 값만 있고 injection/eSWT/extraTreatments가 모두 없는 경우 true를 반환한다.
+func (i Treatments) HasOnlyFollowUp() bool {
+	if i.followUp == "" {
+		return false
+	}
+	if i.eSWT.IsEmpty() && len(i.extraTreatments) == 0 {
+		for _, inj := range i.injections {
+			if !inj.isFromClipboard {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// GetStandaloneFollowUpText 는 주사 등 다른 치료 없이 f/u 만 있을 때 해당 텍스트를 반환한다.
+// 반환된 문자열은 simpleText(커서 위치 바로 입력)로 사용된다.
+func (i Treatments) GetStandaloneFollowUpText() string {
+	if !i.HasOnlyFollowUp() {
+		return ""
+	}
+	return i.buildFollowUpLine("")
+}
 func (i Treatments) GetESWT() ESWT {
 	return i.eSWT
 }
@@ -266,7 +310,17 @@ func (i Treatments) GetTextForChart() string {
 		}
 	}
 
+	// C-arm 처치(carmTreat)가 있으면 f/u) 전에 pt) 도수프리/자기장 추가
+	if carmTreat != "" {
+		text += "pt) 도수프리\n    자기장\n"
+	}
+
+	if text == "" && i.followUp == "" {
+		return ""
+	}
+
 	if text == "" {
+		// 주사 없이 f/u 전용 입력인 경우 → simpleText로 처리하므로 chartText에서는 제외
 		return ""
 	}
 
@@ -283,8 +337,7 @@ func (i Treatments) GetTextForChart() string {
 		return text + "f/u) " + i.getFollowUpDate(0) + "\n"
 	}
 
-	day, _ := strconv.Atoi(i.followUp)
-	return text + "f/u) " + i.getFollowUpDate(day) + "\n"
+	return i.buildFollowUpLine(text)
 }
 func (i Treatments) GetTextForSpecific() string {
 	var text string

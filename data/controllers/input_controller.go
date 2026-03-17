@@ -106,13 +106,6 @@ func (c *InputController) Start() {
 				continue
 			}
 
-			// ESC 종료 (VK_ESCAPE=27)
-			if ev.Rawcode == 27 {
-				fmt.Println("🚪 [EXIT] Program terminating")
-				os.Stdout.Sync()
-				os.Exit(0)
-			}
-
 			// 활성화된 창에서만 동작하도록 체크
 			if !isActivatedWindow() {
 				continue
