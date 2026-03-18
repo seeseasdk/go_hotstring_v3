@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
@@ -15,6 +16,9 @@ type ChannelController struct {
 
 	// Reset signal for treatments
 	ResetChan chan bool
+
+	// TypeStr 출력 중 hotstring 버퍼 입력 차단 플래그
+	IsMuting atomic.Bool
 }
 
 func NewChannelController() *ChannelController {

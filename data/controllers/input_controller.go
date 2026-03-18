@@ -1,9 +1,8 @@
 package controllers
 
 import (
-	"fmt"
 	"log/slog"
-	"os"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -81,8 +80,7 @@ func NewInputController(cc *ChannelController) *InputController {
 
 func (c *InputController) Start() {
 	slog.Info("InputController started. Listening for global input...")
-	fmt.Println("💡 [TIP] Ctrl+Enter to flush, Ctrl+C or ESC to exit")
-	os.Stdout.Sync()
+	slog.Info("[TIP] Ctrl+Enter to flush, Ctrl+C or ESC to exit")
 
 	// 글로벌 키보드 훅 시작
 	EvChan := hook.Start()
@@ -114,7 +112,7 @@ func (c *InputController) Start() {
 			// Ctrl + - 액션 (pacsButton 클릭)
 			// Windows에서 대시키(VK_OEM_MINUS)는 189, 텐키패드 마이너스(VK_SUBTRACT)는 109
 			if ctrlPressed && (ev.Rawcode == 189 || ev.Rawcode == 109) {
-				fmt.Println("👆 [CTRL+-] PACS Button Clicked!")
+				slog.Info("[CTRL+-] PACS Button Clicked!")
 				if coord, exists := hotstrings.K_Coordinates["pacsButton"]; exists {
 					robotgo.Move(coord.X, coord.Y)
 					robotgo.Click("left")
@@ -125,7 +123,7 @@ func (c *InputController) Start() {
 			// Ctrl + + 액션 (completeButton 클릭)
 			// Windows에서 플러스키(VK_OEM_PLUS)는 187, 텐키패드 플러스(VK_ADD)는 107
 			if ctrlPressed && (ev.Rawcode == 187 || ev.Rawcode == 107) {
-				fmt.Println("👆 [CTRL++] Complete Button Clicked!")
+				slog.Info("[CTRL++] Complete Button Clicked!")
 				if coord, exists := hotstrings.K_Coordinates["completeButton"]; exists {
 					robotgo.Move(coord.X, coord.Y)
 					robotgo.Click("left")
@@ -133,10 +131,52 @@ func (c *InputController) Start() {
 				continue
 			}
 
+			// Ctrl + / 액션 (클립보드 복사 후 날짜 없는 줄에 공백 9칸 추가 → specificWindow 입력)
+			// 메인키보드 /(VK_OEM_2)=191, 넘패드 /(VK_DIVIDE)=111
+			if ctrlPressed && (ev.Rawcode == 191 || ev.Rawcode == 111) {
+				slog.Info("[CTRL+/] Copying clipboard and formatting for specificWindow!")
+
+				go func() {
+					// 1. Ctrl + C 로 클립보드 복사
+					robotgo.KeyTap("c", "ctrl")
+					time.Sleep(100 * time.Millisecond)
+
+					// 2. 클립보드 읽기
+					text, err := robotgo.ReadAll()
+					if err != nil || text == "" {
+						return
+					}
+
+					// 3. 줄 단위로 처리: 날짜(YYYY-MM-DD)로 시작하면 그대로, 아니면 공백 9칸 앞에 추가
+					datePrefix := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+					lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+					var processed []string
+					for _, line := range lines {
+						if datePrefix.MatchString(line) {
+							processed = append(processed, line)
+						} else {
+							processed = append(processed, "         "+line) // 공백 9칸
+						}
+					}
+					formatted := strings.Join(processed, "\n")
+
+					// 4. OutputStuff 생성 후 specificText에 담아 OutputChan으로 직접 전송
+					output := models.NewOutputStuff(0, "", formatted, "", nil, "", "", "")
+					c.cc.OutputChan <- models.NewChannelStuff(
+						"InputController",
+						"OutputController",
+						"UpdateOutput",
+						true,
+						output,
+					)
+				}()
+				continue
+			}
+
 			// Ctrl + * 액션 (선택영역 복사 후 specificText로 입력)
 			// 텐키패드 별표(VK_MULTIPLY)=106, 메인키보드 별표(Shift+8)=56
 			if ctrlPressed && (ev.Rawcode == 106 || (shiftPressed && ev.Rawcode == 56)) {
-				fmt.Println("👆 [CTRL+*] Copying and pasting as treatment!")
+				slog.Info("[CTRL+*] Copying and pasting as treatment!")
 
 				go func() {
 					// 1. Ctrl + C 입력해서 클립보드로 복사
@@ -171,8 +211,7 @@ func (c *InputController) Start() {
 
 			// Ctrl + Enter (트리거) (VK_RETURN=13)
 			if ctrlPressed && ev.Rawcode == 13 {
-				fmt.Println("🚀 [CTRL+ENTER] Triggered!")
-				os.Stdout.Sync()
+				slog.Info("[CTRL+ENTER] Triggered!")
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -184,8 +223,7 @@ func (c *InputController) Start() {
 			}
 			// 일반 Enter (VK_RETURN=13) - buffer 초기화
 			if !ctrlPressed && ev.Rawcode == 13 {
-				fmt.Println("🔄 [ENTER] Buffer cleared!")
-				os.Stdout.Sync()
+				slog.Debug("[ENTER] Buffer cleared!")
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -198,8 +236,7 @@ func (c *InputController) Start() {
 
 			// Space (VK_SPACE=32) - buffer 초기화
 			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 40) || ev.Rawcode == 46 {
-				fmt.Println("🔄 [SPACE] Buffer cleared!")
-				os.Stdout.Sync()
+				slog.Debug("[SPACE] Buffer cleared!")
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -223,6 +260,11 @@ func (c *InputController) Start() {
 
 			// 일반 문자 입력 처리 (핫스트링 패턴 매칭용)
 			if !ctrlPressed {
+				// TypeStr 출력 중에는 hotstring 버퍼에 추가하지 않음
+				if c.cc.IsMuting.Load() {
+					continue
+				}
+
 				var charRune rune = 0
 
 				// A-Z (Rawcode 65-90) -> 소문자로 변환

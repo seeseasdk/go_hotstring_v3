@@ -1,9 +1,7 @@
 package controllers
 
 import (
-	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"strings"
 
@@ -15,6 +13,7 @@ type HotstringController struct {
 	cc         *ChannelController
 	buffer     string
 	treatments *models.Treatments
+	isMuting   bool // TypeStr 출력 중 버퍼 추가 차단
 }
 
 func NewHotstringController(cc *ChannelController) *HotstringController {
@@ -33,8 +32,7 @@ func (c *HotstringController) Start() {
 			select {
 			case stuff := <-c.cc.InputChan:
 				if stuff.Do == "FlushTreatments" {
-					fmt.Printf("🚀 [FLUSH] Processing buffer: '%s'\n", c.buffer)
-					os.Stdout.Sync()
+					slog.Info("[FLUSH] Processing buffer", "buffer", c.buffer)
 
 					// Ctrl+* 트리거는 클립보드 기반이므로 deleteHostring = 0
 					isClipboard := stuff.Object == nil
@@ -55,12 +53,15 @@ func (c *HotstringController) Start() {
 
 				// AddChar message processing
 				if stuff.Do == "AddChar" {
+					// 출력 중 뮤팅 상태이면 버퍼에 추가하지 않음
+					if c.isMuting {
+						continue
+					}
 					if charMap, ok := stuff.Object.(map[string]interface{}); ok {
 						if char, exists := charMap["char"]; exists {
 							if charRune, ok := char.(rune); ok {
 								c.buffer += string(charRune)
-								fmt.Printf("📝 [BUFFER] '%s'\n", c.buffer)
-								os.Stdout.Sync()
+								slog.Debug("[BUFFER] updated", "buffer", c.buffer)
 							}
 						}
 					}
@@ -175,22 +176,34 @@ func (c *HotstringController) Start() {
 							}
 						}
 
-						fmt.Printf("📋 [CLIPBOARD Parsed to Treatments] '%s'\n", text)
-						os.Stdout.Sync()
+						slog.Info("[CLIPBOARD] Parsed to Treatments", "text", text)
 					}
+					continue
+				}
+
+				// MuteStart message processing - TypeStr 출력 중 버퍼 추가 차단 시작
+				if stuff.Do == "MuteStart" {
+					c.isMuting = true
+					slog.Debug("[BUFFER] muting started")
+					continue
+				}
+
+				// ClearBuffer message processing - 버퍼 초기화 및 뮤팅 해제
+				if stuff.Do == "ClearBuffer" {
+					c.buffer = ""
+					c.isMuting = false
+					slog.Debug("[BUFFER] cleared and unmuted")
 					continue
 				}
 
 				// Backspace message processing
 				if stuff.Do == "Backspace" {
 					if len(c.buffer) > 0 {
-						// Remove the last character (considering unicode/runes properly by converting to runes first)
 						runes := []rune(c.buffer)
 						if len(runes) > 0 {
 							c.buffer = string(runes[:len(runes)-1])
 						}
-						fmt.Printf("🔙 [BUFFER] '%s'\n", c.buffer)
-						os.Stdout.Sync()
+						slog.Debug("[BUFFER] backspace", "buffer", c.buffer)
 					}
 					continue
 				}
@@ -402,6 +415,10 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 	deleteCount := 0
 	output := models.NewOutputStuff(deleteCount, "", "", "", []string{}, "", "", "")
 
+	// 중복 추가 방지용 추적 맵
+	addedInjectionKeys := make(map[string]bool)
+	addedSimpleTexts := make(map[string]bool)
+
 	var combinedFirstMeeting *models.FirstMeeting
 	hasBlocksMatch := false
 	var lastBlockBaseKey string
@@ -558,11 +575,25 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 			case "Blocks-Direct", "Blocks-C", "Blocks-P":
 				injection := match.value.(*models.Injection)
 				slog.Debug("Hotstring Triggered (Blocks)", "trigger", match.key, "site", injection.GetSite())
-				c.treatments.SetAddInjection(*injection)
-				// etc 필드에 추가 injection이 있으면 자동으로 함께 추가
-				if etcInj, ok := injection.GetEtc().(*models.Injection); ok {
-					slog.Debug("Hotstring Triggered (Blocks etc)", "trigger", match.key, "site", etcInj.GetSite())
-					c.treatments.SetAddInjection(*etcInj)
+				injKey := injection.GetDirection() + "|" + injection.GetSite()
+				if addedInjectionKeys[injKey] {
+					slog.Error("[DUPLICATE] injection already added", "key", injKey, "buffer", c.buffer)
+					output.SetErrorMsg("중복된 항목: " + injKey)
+				} else {
+					addedInjectionKeys[injKey] = true
+					c.treatments.SetAddInjection(*injection)
+					// etc 필드에 추가 injection이 있으면 자동으로 함께 추가
+					if etcInj, ok := injection.GetEtc().(*models.Injection); ok {
+						etcKey := etcInj.GetDirection() + "|" + etcInj.GetSite()
+						if addedInjectionKeys[etcKey] {
+							slog.Error("[DUPLICATE] etc injection already added", "key", etcKey, "buffer", c.buffer)
+							output.SetErrorMsg("중복된 항목: " + etcKey)
+						} else {
+							slog.Debug("Hotstring Triggered (Blocks etc)", "trigger", match.key, "site", etcInj.GetSite())
+							addedInjectionKeys[etcKey] = true
+							c.treatments.SetAddInjection(*etcInj)
+						}
+					}
 				}
 				hasBlocksMatch = true
 				lastBlockBaseKey = match.baseKey
@@ -571,14 +602,20 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 				slog.Debug("Hotstring Triggered (Simples)", "trigger", match.key)
 				simple, ok := match.value.(*models.SimpleInput)
 				if ok {
-					curSimple := output.GetSimpleText()
-					if curSimple != "" {
-						output.SetSimpleText(curSimple + "\n" + simple.GetText())
+					if addedSimpleTexts[simple.GetText()] {
+						slog.Error("[DUPLICATE] simple text already added", "text", simple.GetText(), "buffer", c.buffer)
+						output.SetErrorMsg("중복된 항목: " + simple.GetText())
 					} else {
-						output.SetSimpleText(simple.GetText())
-					}
-					if simple.GetExtraDo() != "" {
-						output.SetExtraDo(simple.GetExtraDo())
+						addedSimpleTexts[simple.GetText()] = true
+						curSimple := output.GetSimpleText()
+						if curSimple != "" {
+							output.SetSimpleText(curSimple + ", " + simple.GetText())
+						} else {
+							output.SetSimpleText(simple.GetText())
+						}
+						if simple.GetExtraDo() != "" {
+							output.SetExtraDo(simple.GetExtraDo())
+						}
 					}
 				}
 			case "SimpleCode":
@@ -617,8 +654,15 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 					i++
 				} else if c.buffer[i] == 'c' {
 					if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
-						slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
-						c.treatments.SetAddInjection(*caudalVal)
+						caudalKey := caudalVal.GetDirection() + "|" + caudalVal.GetSite()
+						if addedInjectionKeys[caudalKey] {
+							slog.Error("[DUPLICATE] caudal already added", "buffer", c.buffer)
+							output.SetErrorMsg("중복된 항목: caudal")
+						} else {
+							slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
+							addedInjectionKeys[caudalKey] = true
+							c.treatments.SetAddInjection(*caudalVal)
+						}
 						processed[i] = true
 					}
 				} else if c.buffer[i] == 'p' {
@@ -742,6 +786,10 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 		deleteCount = len(processed)
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
+			// z/x/s prefix는 processed에 포함되지 않으므로 추가
+			if isFirstMeetingMode || isXrayMode || isSonoMode {
+				deleteCount += 1
+			}
 		}
 		if deleteCount > 20 {
 			deleteCount = 20
