@@ -50,9 +50,9 @@ type OutputStuff struct {
 	drug           string // 약 날짜 (일수)
 	drugCode       string // 약 주문 코드 (.+51 등)
 	// followUp       string // 추적관찰 날짜
-	extraDo  string // 추가적인 동작을 수행할 때 사용
+	extraDo        string // 추가적인 동작을 수행할 때 사용
 	skipChartEnter bool   // z 트리거 시 chartWindow Enter 입력 생략
-	errorMsg string // 에러 메세지 (중복 등) - 설정 시 키보드 입력 스킵
+	errorMsg       string // 에러 메세지 (중복 등) - 설정 시 키보드 입력 스킵
 }
 
 func NewOutputStuff(deleteHostring int, chartText, specificText, mx999Text string, orderCode []string, memoText, simpleText, drug string) *OutputStuff {
