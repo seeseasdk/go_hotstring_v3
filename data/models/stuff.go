@@ -53,6 +53,7 @@ type OutputStuff struct {
 	extraDo        string // 추가적인 동작을 수행할 때 사용
 	skipChartEnter bool   // z 트리거 시 chartWindow Enter 입력 생략
 	errorMsg       string // 에러 메세지 (중복 등) - 설정 시 키보드 입력 스킵
+	isClipboard    bool   // Ctrl+* 클립보드 트리거 여부 (specificText를 현재 커서 위치에 입력)
 }
 
 func NewOutputStuff(deleteHostring int, chartText, specificText, mx999Text string, orderCode []string, memoText, simpleText, drug string) *OutputStuff {
@@ -134,6 +135,12 @@ func (os *OutputStuff) SetErrorMsg(errorMsg string) {
 }
 func (os *OutputStuff) GetErrorMsg() string {
 	return os.errorMsg
+}
+func (os *OutputStuff) SetIsClipboard(v bool) {
+	os.isClipboard = v
+}
+func (os *OutputStuff) GetIsClipboard() bool {
+	return os.isClipboard
 }
 func (os *OutputStuff) SetReset() {
 	os.deleteHostring = 0

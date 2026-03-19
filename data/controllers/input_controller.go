@@ -147,8 +147,9 @@ func (c *InputController) Start() {
 						return
 					}
 
-					// 3. 줄 단위로 처리: 빈 줄 제거, 날짜(YYYY-MM-DD)로 시작하면 그대로, 아니면 공백 9칸 앞에 추가
+					// 3. 줄 단위로 처리: 빈 줄 제거, 날짜(YYYY-MM-DD)로 시작하면 그대로, 아니면 공백 추가
 					datePrefix := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+					knownPrefixes := []string{"c) ", "s) ", "p) ", "snt) ", "ef) ", "e) ", "pt) ", "pe) ", "f/u) "}
 					lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 					var processed []string
 					for _, line := range lines {
@@ -158,7 +159,19 @@ func (c *InputController) Start() {
 						if datePrefix.MatchString(line) {
 							processed = append(processed, line)
 						} else {
-							processed = append(processed, "                "+line) // 공백 16칸
+							trimmed := strings.TrimLeft(line, " \t")
+							hasKnownPrefix := false
+							for _, pfx := range knownPrefixes {
+								if strings.HasPrefix(trimmed, pfx) {
+									hasKnownPrefix = true
+									break
+								}
+							}
+							if hasKnownPrefix {
+								processed = append(processed, "                "+trimmed) // 16칸
+							} else {
+								processed = append(processed, "                    "+trimmed) // 20칸
+							}
 						}
 					}
 					formatted := strings.Join(processed, "\n")

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/seeseasdk/go_hotstring_v3/data/constants"
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
 )
@@ -75,6 +76,7 @@ func (c *HotstringController) Start() {
 						lines := strings.Split(text, "\n")
 						lastIsWithCarm := false
 						lastIsPeri := false
+						lastWasErFocus := false
 						for _, line := range lines {
 							line = strings.TrimSpace(line)
 							if line == "" {
@@ -121,6 +123,7 @@ func (c *HotstringController) Start() {
 							}
 
 							if isWithCarm || isPeri {
+								lastWasErFocus = false
 								// 끝에 " p" 나 " n" 이 있는지 확인
 								isP := false
 								if strings.HasSuffix(line, " p") {
@@ -174,10 +177,22 @@ func (c *HotstringController) Start() {
 								c.treatments.SetAddInjection(*inj)
 							} else {
 								// Injection 형태가 아닌 다른 부분(eswt 등)이라면 일단 기존처럼 메모로 추가
-								if strings.HasPrefix(line, "radial on") {
-									c.treatments.AddClipboardMemo("    " + line)
-								} else {
+								if strings.HasPrefix(line, "er) focus") {
+									lastWasErFocus = true
 									c.treatments.AddClipboardMemo(line)
+								} else if lastWasErFocus && strings.HasPrefix(line, "radial") {
+									if strings.HasPrefix(line, "radial on") {
+										c.treatments.AddClipboardMemo("       " + line) // 4+3=7칸
+									} else {
+										c.treatments.AddClipboardMemo("   " + line) // 3칸
+									}
+								} else {
+									lastWasErFocus = false
+									if strings.HasPrefix(line, "radial on") {
+										c.treatments.AddClipboardMemo("    " + line)
+									} else {
+										c.treatments.AddClipboardMemo(line)
+									}
 								}
 							}
 						}
@@ -264,7 +279,16 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 
 	isFirstMeetingMode := strings.HasPrefix(c.buffer, "z")
 	isXrayMode := strings.HasPrefix(c.buffer, "x")
+	// s로 시작하더라도 K_SIMPLE_CODE 키가 버퍼 앞에서부터 매칭되면 소노 모드가 아닌 일반 모드로 처리
 	isSonoMode := strings.HasPrefix(c.buffer, "s")
+	if isSonoMode {
+		for k := range hotstrings.K_SIMPLE_CODE {
+			if strings.HasPrefix(c.buffer, k) {
+				isSonoMode = false
+				break
+			}
+		}
+	}
 
 	if isFirstMeetingMode {
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting만 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
@@ -478,6 +502,42 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
 							pe := models.NewPainEraser(inj.GetDirection(), inj.GetEswtFocus(), "pe0")
 							c.treatments.SetAddExtraTreatments(*pe)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						}
+					} else if strings.HasPrefix(remainder, "ef") {
+						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
+							newEswt := *eswtVal
+							newEswt.SetFeeType(constants.K_FREE)
+							c.treatments.SetESWT(newEswt)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), constants.K_FREE, false)
+							c.treatments.SetESWT(*eswt)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						}
+					} else if strings.HasPrefix(remainder, "er") {
+						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (ESWT-er Suffix)", "trigger", match.key+"er", "baseKey", match.baseKey)
+							newEswt := *eswtVal
+							newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
+							c.treatments.SetESWT(newEswt)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
+							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
@@ -702,15 +762,48 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 					c.treatments.SetHasSeven(true)
 					processed[i] = true
 				} else if c.buffer[i] == 'e' {
-					if lastBlockInjection != nil {
-						if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
-							c.treatments.SetESWT(*eswtVal)
-						} else if lastBlockInjection.GetEswtFocus() != "" {
-							eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false)
-							c.treatments.SetESWT(*eswt)
+					if i+1 < len(c.buffer) && !processed[i+1] && c.buffer[i+1] == 'f' {
+						// ef 잔여 → K_FREE (ef) focus+radial, 코드 .+999_ef
+						if lastBlockInjection != nil {
+							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
+								newEswt := *eswtVal
+								newEswt.SetFeeType(constants.K_FREE)
+								c.treatments.SetESWT(newEswt)
+							} else if lastBlockInjection.GetEswtFocus() != "" {
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE, false)
+								c.treatments.SetESWT(*eswt)
+							}
 						}
+						processed[i] = true
+						processed[i+1] = true
+						i++
+					} else if i+1 < len(c.buffer) && !processed[i+1] && c.buffer[i+1] == 'r' {
+						// er 잔여 → K_FREE_RADIAL_ONLY (ef) radial only, 코드 .+999_ef
+						if lastBlockInjection != nil {
+							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
+								newEswt := *eswtVal
+								newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
+								c.treatments.SetESWT(newEswt)
+							} else if lastBlockInjection.GetEswtFocus() != "" {
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
+								c.treatments.SetESWT(*eswt)
+							}
+						}
+						processed[i] = true
+						processed[i+1] = true
+						i++
+					} else {
+						// e 단독 → K_NORMAL (e) focus+radial
+						if lastBlockInjection != nil {
+							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
+								c.treatments.SetESWT(*eswtVal)
+							} else if lastBlockInjection.GetEswtFocus() != "" {
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false)
+								c.treatments.SetESWT(*eswt)
+							}
+						}
+						processed[i] = true
 					}
-					processed[i] = true
 				} else if c.buffer[i] == 's' {
 					if lastBlockInjection != nil {
 						sntCode := ".+999_s"
@@ -862,6 +955,11 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 			ct = insert
 		}
 		output.SetChartText(ct)
+	}
+
+	// 클립보드 트리거(Ctrl+*) 플래그 설정
+	if isClipboard {
+		output.SetIsClipboard(true)
 	}
 
 	// 매칭된 글자 수 + 트리거 키 1 = deleteCount

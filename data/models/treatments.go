@@ -392,7 +392,7 @@ func (i Treatments) GetTextForSpecific() string {
 		case constants.K_NORMAL:
 			text += "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
 			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
-		case constants.K_ESWT_FREE:
+		case constants.K_FREE:
 			text += "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
 			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 		case constants.K_FREE_RADIAL_ONLY:
@@ -692,7 +692,7 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		case constants.K_FREE:
 			result = append(result, constants.K_ESWT_FREE)
 		case constants.K_FREE_RADIAL_ONLY:
-			result = append(result, constants.K_ESWT_FREE_RADIAL)
+			result = append(result, constants.K_ESWT_FREE) // er 도 .+999_ef 코드 사용
 		default:
 			return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 		}
