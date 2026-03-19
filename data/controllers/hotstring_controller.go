@@ -114,6 +114,12 @@ func (c *HotstringController) Start() {
 								lastIsPeri = false
 							}
 
+							// m8, m13 라인은 그 전체를 specificText(clipboardMemos)에 바로 추가
+							if line == "m8" || line == "m13" || strings.HasPrefix(line, "m8 ") || strings.HasPrefix(line, "m13 ") {
+								c.treatments.AddClipboardMemo(line)
+								continue
+							}
+
 							if isWithCarm || isPeri {
 								// 끝에 " p" 나 " n" 이 있는지 확인
 								isP := false
@@ -421,6 +427,9 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 
 	var combinedFirstMeeting *models.FirstMeeting
 	hasBlocksMatch := false
+	hasCPrefix := false
+	hasPPrefix := false
+	var etcOrderCodes []string
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
 
@@ -582,16 +591,35 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 				} else {
 					addedInjectionKeys[injKey] = true
 					c.treatments.SetAddInjection(*injection)
-					// etc 필드에 추가 injection이 있으면 자동으로 함께 추가
-					if etcInj, ok := injection.GetEtc().(*models.Injection); ok {
-						etcKey := etcInj.GetDirection() + "|" + etcInj.GetSite()
+					// etc 필드 처리: *Injection 이면 추가 주사, string 이면 오더코드
+					switch etcVal := injection.GetEtc().(type) {
+					case *models.Injection:
+						etcKey := etcVal.GetDirection() + "|" + etcVal.GetSite()
 						if addedInjectionKeys[etcKey] {
 							slog.Error("[DUPLICATE] etc injection already added", "key", etcKey, "buffer", c.buffer)
 							output.SetErrorMsg("중복된 항목: " + etcKey)
 						} else {
-							slog.Debug("Hotstring Triggered (Blocks etc)", "trigger", match.key, "site", etcInj.GetSite())
+							slog.Debug("Hotstring Triggered (Blocks etc)", "trigger", match.key, "site", etcVal.GetSite())
 							addedInjectionKeys[etcKey] = true
-							c.treatments.SetAddInjection(*etcInj)
+							c.treatments.SetAddInjection(*etcVal)
+							// 중첩 injection의 etc 코드도 확인
+							if nestedCode, ok := etcVal.GetEtc().(string); ok {
+								etcOrderCodes = append(etcOrderCodes, nestedCode)
+								switch nestedCode {
+								case ".+999_pf_0":
+									hasCPrefix = true
+								case ".+999_pm_0":
+									hasPPrefix = true
+								}
+							}
+						}
+					case string:
+						etcOrderCodes = append(etcOrderCodes, etcVal)
+						switch etcVal {
+						case ".+999_pf_0":
+							hasCPrefix = true
+						case ".+999_pm_0":
+							hasPPrefix = true
 						}
 					}
 				}
@@ -706,12 +734,36 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 		c.treatments.SetAllInjectionsIsP(true)
 	}
 
+	// 모드 프리픽스 문자(z/x/s)는 별도로 processed에 표시
+	if isFirstMeetingMode || isXrayMode || isSonoMode {
+		processed[0] = true
+	}
+
+	// 매칭되지 않은 문자가 있으면 트리거 전체 취소 (100% 매칭이 되어야 출력)
+	var unmatched strings.Builder
+	for i := 0; i < len(c.buffer); i++ {
+		if !processed[i] {
+			unmatched.WriteByte(c.buffer[i])
+		}
+	}
+	if unmatched.Len() > 0 {
+		slog.Error("Hotstring trigger cancelled: unmatched characters",
+			"trigger", c.buffer,
+			"unmatched", unmatched.String(),
+		)
+		return models.NewOutputStuff(0, "", "", "", []string{}, "", "", "")
+	}
+
 	if isFirstMeetingMode && combinedFirstMeeting != nil {
 		re := regexp.MustCompile(`f(\d+[dmyw]?)`)
 		durationMatches := re.FindStringSubmatch(c.buffer)
 		if len(durationMatches) > 1 {
 			combinedFirstMeeting.SetDuration(durationMatches[1])
 		}
+	}
+
+	if isFirstMeetingMode {
+		output.SetSkipChartEnter(true)
 	}
 
 	if combinedFirstMeeting != nil {
@@ -774,11 +826,42 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 
 		codes, _ := c.treatments.GetOrderCode()
 		output.AddOrderCodeList(codes)
+		for _, ec := range etcOrderCodes {
+			output.AddOrderCode(ec)
+		}
 
 		drug := c.treatments.GetDrug()
 		if drug != "" {
 			output.SetDrug(drug)
 		}
+	}
+
+	// etc 코드가 .+999_pf_0 이면 "pt) 도수프리\n    자기장\n" 를 f/u) 앞에 삽입
+	if hasCPrefix {
+		ct := output.GetChartText()
+		insert := "pt) 도수프리\n     자기장\n"
+		if strings.Contains(ct, "f/u)") {
+			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
+		} else if ct != "" {
+			ct += insert
+		} else {
+			ct = insert
+		}
+		output.SetChartText(ct)
+	}
+
+	// etc 코드가 .+999_pm_0 이면 "pt) 자기장\n" 를 f/u) 앞에 삽입
+	if hasPPrefix {
+		ct := output.GetChartText()
+		insert := "pt) 자기장\n"
+		if strings.Contains(ct, "f/u)") {
+			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
+		} else if ct != "" {
+			ct += insert
+		} else {
+			ct = insert
+		}
+		output.SetChartText(ct)
 	}
 
 	// 매칭된 글자 수 + 트리거 키 1 = deleteCount

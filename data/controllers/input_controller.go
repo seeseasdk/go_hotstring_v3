@@ -137,8 +137,8 @@ func (c *InputController) Start() {
 				slog.Info("[CTRL+/] Copying clipboard and formatting for specificWindow!")
 
 				go func() {
-					// 1. Ctrl + C 로 클립보드 복사
-					robotgo.KeyTap("c", "ctrl")
+					// 1. Ctrl + X 로 클립보드 복사
+					robotgo.KeyTap("x", "ctrl")
 					time.Sleep(100 * time.Millisecond)
 
 					// 2. 클립보드 읽기
@@ -147,15 +147,18 @@ func (c *InputController) Start() {
 						return
 					}
 
-					// 3. 줄 단위로 처리: 날짜(YYYY-MM-DD)로 시작하면 그대로, 아니면 공백 9칸 앞에 추가
+					// 3. 줄 단위로 처리: 빈 줄 제거, 날짜(YYYY-MM-DD)로 시작하면 그대로, 아니면 공백 9칸 앞에 추가
 					datePrefix := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
 					lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 					var processed []string
 					for _, line := range lines {
+						if strings.TrimSpace(line) == "" {
+							continue // 빈 줄 제거
+						}
 						if datePrefix.MatchString(line) {
 							processed = append(processed, line)
 						} else {
-							processed = append(processed, "         "+line) // 공백 9칸
+							processed = append(processed, "                "+line) // 공백 16칸
 						}
 					}
 					formatted := strings.Join(processed, "\n")

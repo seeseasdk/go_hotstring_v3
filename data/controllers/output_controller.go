@@ -77,6 +77,11 @@ func (c *OutputController) Start() {
 						robotgo.KeyToggle("ctrl", "up")
 						time.Sleep(50 * time.Millisecond)
 
+						if !output.GetSkipChartEnter() {
+							robotgo.KeyTap("enter")
+							time.Sleep(50 * time.Millisecond)
+						}
+
 						// 키보드 입력을 통해 글자 입력 (로봇고 사용)
 						robotgo.TypeStr(chartText)
 						time.Sleep(50 * time.Millisecond)
@@ -96,6 +101,9 @@ func (c *OutputController) Start() {
 						robotgo.KeyTap("end")
 						time.Sleep(10 * time.Millisecond)
 						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(50 * time.Millisecond)
+
+						robotgo.KeyTap("enter")
 						time.Sleep(50 * time.Millisecond)
 
 						robotgo.TypeStr(specificText)
@@ -163,6 +171,14 @@ func (c *OutputController) Start() {
 						robotgo.Move(coord.X, coord.Y)
 						robotgo.Click("left")
 						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
+
+						robotgo.KeyToggle("ctrl", "down")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyTap("end")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(50 * time.Millisecond)
+
 						robotgo.TypeStr(mx999Text)
 						time.Sleep(50 * time.Millisecond)
 					}
@@ -174,6 +190,14 @@ func (c *OutputController) Start() {
 						robotgo.Move(coord.X, coord.Y)
 						robotgo.Click("left")
 						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
+
+						robotgo.KeyToggle("ctrl", "down")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyTap("end")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(50 * time.Millisecond)
+
 						robotgo.TypeStr(memoText)
 						time.Sleep(50 * time.Millisecond)
 					}

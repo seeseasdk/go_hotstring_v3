@@ -51,6 +51,7 @@ type OutputStuff struct {
 	drugCode       string // 약 주문 코드 (.+51 등)
 	// followUp       string // 추적관찰 날짜
 	extraDo  string // 추가적인 동작을 수행할 때 사용
+	skipChartEnter bool   // z 트리거 시 chartWindow Enter 입력 생략
 	errorMsg string // 에러 메세지 (중복 등) - 설정 시 키보드 입력 스킵
 }
 
@@ -87,6 +88,11 @@ func (os *OutputStuff) AddOrderCode(orderCode string) {
 	if os.orderCode == nil {
 		os.orderCode = []string{}
 	}
+	for _, existing := range os.orderCode {
+		if existing == orderCode {
+			return
+		}
+	}
 	os.orderCode = append(os.orderCode, orderCode)
 }
 func (os *OutputStuff) AddOrderCodeList(orderCode []string) {
@@ -116,6 +122,12 @@ func (os *OutputStuff) GetDrugCode() string {
 //	}
 func (os *OutputStuff) SetExtraDo(extraDo string) {
 	os.extraDo = extraDo
+}
+func (os *OutputStuff) SetSkipChartEnter(skip bool) {
+	os.skipChartEnter = skip
+}
+func (os *OutputStuff) GetSkipChartEnter() bool {
+	return os.skipChartEnter
 }
 func (os *OutputStuff) SetErrorMsg(errorMsg string) {
 	os.errorMsg = errorMsg

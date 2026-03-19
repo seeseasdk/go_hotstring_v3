@@ -311,11 +311,6 @@ func (i Treatments) GetTextForChart() string {
 		}
 	}
 
-	// C-arm 처치(carmTreat)가 있으면 f/u) 전에 pt) 도수프리/자기장 추가
-	if carmTreat != "" {
-		text += "pt) 도수프리\n    자기장\n"
-	}
-
 	if text == "" && i.followUp == "" {
 		return ""
 	}
@@ -387,10 +382,9 @@ func (i Treatments) GetTextForSpecific() string {
 	text += periTreat
 
 	if !i.eSWT.IsEmpty() {
-		switch i.eSWT.GetIsOnlyEswt() {
-		case true:
+		if text == "" {
 			text += formattedDate + " "
-		default:
+		} else {
 			text += "                "
 		}
 
@@ -650,14 +644,6 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		result = append(result, injectCode)
 	}
 
-	// c타입 (isWithCarm=true) 치료가 있으면 .+999_pt0 추가
-	for _, inject := range injections {
-		if inject.isWithCarm {
-			result = append(result, ".+999_pt0")
-			break
-		}
-	}
-
 	for _, extra := range i.extraTreatments {
 		switch extra := extra.(type) {
 		case string:
@@ -717,7 +703,8 @@ func (i Treatments) IsEmpty() bool {
 	return len(i.injections) == 0 &&
 		i.drug == "" &&
 		i.followUp == "" &&
-		i.eSWT.IsEmpty() && len(i.extraTreatments) == 0 && !i.isP
+		i.eSWT.IsEmpty() && len(i.extraTreatments) == 0 && !i.isP &&
+		len(i.clipboardMemos) == 0
 }
 func (i Treatments) ToString() string {
 	var treatTemp string
