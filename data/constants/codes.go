@@ -64,7 +64,7 @@ const (
 	K_BOTH_ESWT          = ".+999_e10"
 	K_SINGLE_ESWT        = ".+999_e5"
 	K_ESWT_FREE          = ".+999_ef"
-	K_ESWT_FREE_RADIAL   = "efr"
+	K_ESWT_FREE_RADIAL   = ".+999_efr"
 	K_PAIN_ERASER        = "pe0"
 )
 

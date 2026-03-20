@@ -42,7 +42,8 @@ func (c *HotstringController) Start() {
 					slog.Debug("HotstringController: Triggered", "buffer", c.buffer)
 
 					// Trigger processing of the accumulated buffer
-					output := c.processBuffer(isClipboard)
+					isCtrlEnter := !isClipboard
+					output := c.processBuffer(isClipboard, isCtrlEnter)
 
 					// Then output
 					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateOutput", true, output)
@@ -238,8 +239,61 @@ func (c *HotstringController) Start() {
 	}()
 }
 
+// isLumbarSpineInj reports whether the injection site is a lumbar spine injection.
+func isLumbarSpineInj(site string) bool {
+	return strings.Contains(site, "lmbb") ||
+		strings.Contains(site, "lfjb") ||
+		strings.Contains(site, "lsnrb") ||
+		strings.Contains(site, "ldrgb")
+}
+
+// isCervicalSpineInj reports whether the injection site is a cervical spine injection.
+func isCervicalSpineInj(site string) bool {
+	return strings.Contains(site, "cmbb") ||
+		strings.Contains(site, "cfjb") ||
+		strings.Contains(site, "csnrb") ||
+		strings.Contains(site, "cdrgb")
+}
+
+// isUpperLimbInj reports whether the injection site is an upper limb injection.
+// (cp, sh, eb, wr, fi, ic 계열)
+func isUpperLimbInj(site string) bool {
+	return site == "cpb" ||
+		strings.Contains(site, "shoulder") ||
+		site == "ssnb" ||
+		site == "anb" ||
+		strings.Contains(site, "elbow") ||
+		strings.Contains(site, "cft") ||
+		strings.Contains(site, "cet") ||
+		strings.Contains(site, "wrist") ||
+		site == "apl" ||
+		site == "mnb" ||
+		site == "tfcc" ||
+		site == "hand" ||
+		site == "finger" ||
+		strings.Contains(site, "intercostal")
+}
+
+// isLowerLimbInj reports whether the injection site is a lower limb injection.
+// (ql, pc, kn, sc, sr, ft, st, ak 계열)
+func isLowerLimbInj(site string) bool {
+	return strings.Contains(site, "quadratus") ||
+		site == "pcb" ||
+		site == "hip" ||
+		site == "piriformis" ||
+		strings.Contains(site, "knee") ||
+		strings.Contains(site, "아라간") ||
+		strings.Contains(site, "시노비안") ||
+		site == "snrb" ||
+		strings.Contains(site, "subtalar") ||
+		strings.Contains(site, "ankle") ||
+		strings.Contains(site, "atfl") ||
+		strings.Contains(site, "achilles") ||
+		site == "foot"
+}
+
 // processBuffer scans the buffer and extracts matches sequentially by position
-func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuff {
+func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) *models.OutputStuff {
 	// 모든 가능한 매치를 찾아서 위치별로 정렬
 	type Match struct {
 		position int
@@ -491,23 +545,7 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 					remainder := c.buffer[remainderPos:]
 					matchedSuffix := false
 
-					if strings.HasPrefix(remainder, "pe") {
-						if peVal, exists := hotstrings.K_PainEraser[match.baseKey]; exists {
-							slog.Debug("Hotstring Triggered (PainEraser Suffix)", "trigger", match.key+"pe", "baseKey", match.baseKey)
-							c.treatments.SetAddExtraTreatments(*peVal)
-							processed[remainderPos] = true
-							processed[remainderPos+1] = true
-							remainderPos += 2
-							matchedSuffix = true
-						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
-							pe := models.NewPainEraser(inj.GetDirection(), inj.GetEswtFocus(), "pe0")
-							c.treatments.SetAddExtraTreatments(*pe)
-							processed[remainderPos] = true
-							processed[remainderPos+1] = true
-							remainderPos += 2
-							matchedSuffix = true
-						}
-					} else if strings.HasPrefix(remainder, "ef") {
+					if strings.HasPrefix(remainder, "ef") {
 						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
 							newEswt := *eswtVal
@@ -579,6 +617,23 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 						// 'p'(isP 속성)나 'c'(caudal) 문자가 중간에 끼어 있어도 뒤의 leftover 루프에서 처리할 수 있도록, 무시하고 다음 접미사 탐색을 계속함
 						remainderPos += 1
 						matchedSuffix = true
+					} else if strings.HasPrefix(remainder, "pe") {
+						// pe(PainEraser)는 e/ef/er/s/p 검색이 모두 끝난 후 마지막으로 검색
+						if peVal, exists := hotstrings.K_PainEraser[match.baseKey]; exists {
+							slog.Debug("Hotstring Triggered (PainEraser Suffix)", "trigger", match.key+"pe", "baseKey", match.baseKey)
+							c.treatments.SetAddExtraTreatments(*peVal)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+							pe := models.NewPainEraser(inj.GetDirection(), inj.GetEswtFocus(), "pe0")
+							c.treatments.SetAddExtraTreatments(*pe)
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						}
 					}
 
 					if !matchedSuffix {
@@ -955,6 +1010,54 @@ func (c *HotstringController) processBuffer(isClipboard bool) *models.OutputStuf
 			ct = insert
 		}
 		output.SetChartText(ct)
+	}
+
+	// ctrl+enter 트리거 시 주사 조합 이상 여부 경고
+	if isCtrlEnter {
+		var realInj []models.Injection
+		for _, inj := range c.treatments.GetTreatments() {
+			if !inj.GetIsFromClipboard() {
+				realInj = append(realInj, inj)
+			}
+		}
+		if len(realInj) >= 2 {
+			first := realInj[0]
+			second := realInj[1]
+			var warnings []string
+
+			// Rule 1: 요추 치료 + 상지 주사
+			hasLumbar := isLumbarSpineInj(first.GetSite()) || isLumbarSpineInj(second.GetSite())
+			hasUpper := isUpperLimbInj(first.GetSite()) || isUpperLimbInj(second.GetSite())
+			if hasLumbar && hasUpper {
+				warnings = append(warnings, "⚠ 요추치료 + 상지주사 조합 경고")
+				warnings = append(warnings, "⚠ 처방을 다시 확인하세요")
+			}
+
+			// Rule 2: 경추 치료 + 하지 주사
+			hasCervical := isCervicalSpineInj(first.GetSite()) || isCervicalSpineInj(second.GetSite())
+			hasLower := isLowerLimbInj(first.GetSite()) || isLowerLimbInj(second.GetSite())
+			if hasCervical && hasLower {
+				warnings = append(warnings, "⚠ 경추치료 + 하지주사 조합 경고")
+				warnings = append(warnings, "⚠ 처방을 다시 확인하세요")
+			}
+
+			// Rule 3: 첫번째와 두번째 주사 방향 불일치
+			firstDir := first.GetDirection()
+			secondDir := second.GetDirection()
+			if firstDir != "" && secondDir != "" &&
+				firstDir != "Both" && secondDir != "Both" &&
+				firstDir != secondDir {
+				warnings = append(warnings, "⚠ 주사 방향 불일치 경고")
+				warnings = append(warnings, "⚠ "+firstDir+" vs "+secondDir)
+			}
+
+			if len(warnings) > 0 {
+				ct := output.GetChartText()
+				if ct != "" {
+					output.SetChartText(ct + strings.Join(warnings, "\n") + "\n")
+				}
+			}
+		}
 	}
 
 	// 클립보드 트리거(Ctrl+*) 플래그 설정

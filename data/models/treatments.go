@@ -692,7 +692,7 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		case constants.K_FREE:
 			result = append(result, constants.K_ESWT_FREE)
 		case constants.K_FREE_RADIAL_ONLY:
-			result = append(result, constants.K_ESWT_FREE) // er 도 .+999_ef 코드 사용
+			result = append(result, constants.K_ESWT_FREE_RADIAL)
 		default:
 			return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 		}
