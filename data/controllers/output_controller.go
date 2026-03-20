@@ -133,7 +133,7 @@ func (c *OutputController) Start() {
 							robotgo.TypeStr(drugCode)
 							time.Sleep(500 * time.Millisecond)
 							robotgo.KeyTap("enter")
-							time.Sleep(500 * time.Millisecond)
+							time.Sleep(50 * time.Millisecond)
 							if drugDays != "" {
 								robotgo.TypeStr(drugDays)
 								time.Sleep(500 * time.Millisecond)
@@ -230,6 +230,15 @@ func (c *OutputController) Start() {
 				// 출력 완료 후 뮤팅 해제 및 hotstring 버퍼 초기화 (ClearBuffer가 isMuting=false도 처리)
 				c.cc.IsMuting.Store(false)
 				c.cc.InputChan <- models.NewChannelStuff("OutputController", "HotstringController", "ClearBuffer", false, nil)
+
+				// Ctrl+Enter 트리거이면 항상 chartWindow로 커서 복귀
+				if !output.GetIsClipboard() {
+					if coord, exists := hotstrings.K_Coordinates["chartWindow"]; exists {
+						time.Sleep(50 * time.Millisecond)
+						robotgo.Move(coord.X, coord.Y)
+						robotgo.Click("left")
+					}
+				}
 
 				// Send reset signal to clear
 				c.cc.ResetChan <- true

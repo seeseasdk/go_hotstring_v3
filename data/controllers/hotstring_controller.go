@@ -160,11 +160,12 @@ func (c *HotstringController) Start() {
 
 								site := line // 나머지는 site
 
-								// 매칭되는 코드를 K_Blocks에서 검색
+								// 매칭되는 코드를 K_Blocks에서 검색 (정확히 일치하거나, site가 "known_site " 로 시작하는 경우)
 								code := ""
 								mx999 := site
 								for _, v := range hotstrings.K_Blocks {
-									if v.GetSite() == site {
+									siteName := v.GetSite()
+									if siteName == site || strings.HasPrefix(site, siteName+" ") {
 										code = v.GetCode()
 										mx999 = v.GetMx999()
 										break
@@ -796,7 +797,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					processed[i+1] = true
 					i++
 				} else if c.buffer[i] == 'c' {
-					if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
+					if i == 0 {
+						// 버퍼 첫 글자 'c'는 isWithCarm 프리픽스 의미 → caudal 없이 소비
+						slog.Debug("Hotstring Triggered (Leading 'c' consumed, not caudal)")
+						processed[i] = true
+					} else if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
 						caudalKey := caudalVal.GetDirection() + "|" + caudalVal.GetSite()
 						if addedInjectionKeys[caudalKey] {
 							slog.Error("[DUPLICATE] caudal already added", "buffer", c.buffer)
