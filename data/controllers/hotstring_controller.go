@@ -1018,14 +1018,6 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
-		// specificText에도 pt) 추가 (16칸 빈칸)
-		spec := output.GetSpecificText()
-		specInsert := "pt) 도수프리\n                자기장\n"
-		if spec != "" {
-			output.SetSpecificText(spec + "                " + specInsert)
-		} else {
-			output.SetSpecificText(specInsert)
-		}
 	}
 
 	// etc 코드가 .+999_pm_0 이면 "pt) 자기장\n" 를 f/u) 앞에 삽입
@@ -1040,14 +1032,6 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
-		// specificText에도 pt) 추가 (16칸 빈칸)
-		spec := output.GetSpecificText()
-		specInsert := "pt) 자기장\n"
-		if spec != "" {
-			output.SetSpecificText(spec + "                " + specInsert)
-		} else {
-			output.SetSpecificText(specInsert)
-		}
 	}
 
 	// ctrl+enter 트리거 시 주사 조합 이상 여부 경고

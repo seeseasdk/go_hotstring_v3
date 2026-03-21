@@ -337,85 +337,15 @@ func (i Treatments) GetTextForChart() string {
 }
 func (i Treatments) GetTextForSpecific() string {
 	var text string
-	p := ""
 
-	carmTreat := ""
-	periTreat := ""
-
-	formattedDate := i.day.Format("2006-01-02")
-
-	for _, inject := range i.injections {
-		switch inject.isP {
-		case true:
-			p = "p"
-		default:
-			p = ""
-		}
-		// isN 처리 추가
-		if inject.isN {
-			p = "n"
-		}
-
-		switch inject.isWithCarm {
-		case true:
-			if carmTreat == "" {
-				carmTreat += formattedDate + " " + "c) " + inject.direction + " " + inject.site + " " + p + "\n"
-			} else {
-				if strings.Contains(inject.site, "caudal") {
-					carmTreat += "                    " + inject.site + " " + p + "\n"
-				} else {
-					carmTreat += "                    " + inject.direction + " " + inject.site + " " + p + "\n"
-				}
-			}
-		default:
-			if periTreat == "" && carmTreat == "" {
-				periTreat += formattedDate + " " + "s) " + inject.direction + " " + inject.site + " " + p + "\n"
-			} else if periTreat == "" && carmTreat != "" {
-				periTreat += "                " + "s) " + inject.direction + " " + inject.site + " " + p + "\n"
-			} else {
-				periTreat += "                   " + inject.direction + " " + inject.site + " " + p + "\n"
-			}
-		}
-	}
-
-	text += carmTreat
-	text += periTreat
-
-	if !i.eSWT.IsEmpty() {
-		if text == "" {
-			text += formattedDate + " "
-		} else {
-			text += "                "
-		}
-
-		switch i.eSWT.GetFeeType() {
-		case constants.K_NORMAL:
-			text += "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
-			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
-		case constants.K_FREE:
-			text += "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
-			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
-		case constants.K_FREE_RADIAL_ONLY:
-			text += "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
-		}
-	}
-	if len(i.extraTreatments) > 0 {
-		for _, extra := range i.extraTreatments {
-			switch extra := extra.(type) {
-			case SonoStim:
-				text += "                snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
-			case PainEraser:
-				text += "                pe) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
-			}
-		}
-	}
-
-	// 클립보드 매모(복사한 텍스트)를 specificText에 추가 반영
+	// m8, m13 라인만 pt) 포맷으로 specificText에 추가
 	for _, memo := range i.clipboardMemos {
-		if text == "" {
-			text += memo + "\n"
-		} else {
-			text += "                " + memo + "\n"
+		if memo == "m8" || memo == "m13" || strings.HasPrefix(memo, "m8 ") || strings.HasPrefix(memo, "m13 ") {
+			if !strings.Contains(text, "pt) ") {
+				text += "pt) " + memo + "\n"
+			} else {
+				text += "     " + memo + "\n"
+			}
 		}
 	}
 
