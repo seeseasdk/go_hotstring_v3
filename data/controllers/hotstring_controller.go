@@ -378,6 +378,23 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				idx = actualPos + len(k)
 			}
 		}
+		// xrayMode에서도 "s"+key 패턴의 K_Sonos 검색 허용 (예: xshrsshr → xray shr + sono shr)
+		for k, v := range hotstrings.K_Sonos {
+			target := "s" + k
+			idx := 1 // 'x' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], target)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(target), "Sonos", target, k, v})
+				idx = actualPos + len(target)
+			}
+		}
 	} else if isSonoMode {
 		for k, v := range hotstrings.K_Sonos {
 			idx := 1 // 's' 이후부터 검색
@@ -1001,6 +1018,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
+		// specificText에도 pt) 추가 (16칸 빈칸)
+		spec := output.GetSpecificText()
+		specInsert := "pt) 도수프리\n                자기장\n"
+		if spec != "" {
+			output.SetSpecificText(spec + "                " + specInsert)
+		} else {
+			output.SetSpecificText(specInsert)
+		}
 	}
 
 	// etc 코드가 .+999_pm_0 이면 "pt) 자기장\n" 를 f/u) 앞에 삽입
@@ -1015,6 +1040,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
+		// specificText에도 pt) 추가 (16칸 빈칸)
+		spec := output.GetSpecificText()
+		specInsert := "pt) 자기장\n"
+		if spec != "" {
+			output.SetSpecificText(spec + "                " + specInsert)
+		} else {
+			output.SetSpecificText(specInsert)
+		}
 	}
 
 	// ctrl+enter 트리거 시 주사 조합 이상 여부 경고
