@@ -109,8 +109,8 @@ func (c *HotstringController) Start() {
 								}
 							}
 
-							// e) 나 ef) 혹은 snt) 나 pe) 로 시작하는 건 주사가 아니므로 제외
-							if strings.HasPrefix(line, "e) ") || strings.HasPrefix(line, "ef) ") || strings.HasPrefix(line, "snt) ") || strings.HasPrefix(line, "pe) ") {
+							// e) 나 ef) 혹은 snt) 나 pe) 나 pt) 로 시작하는 건 주사가 아니므로 제외
+							if strings.HasPrefix(line, "e) ") || strings.HasPrefix(line, "ef) ") || strings.HasPrefix(line, "snt) ") || strings.HasPrefix(line, "pe) ") || strings.HasPrefix(line, "pt) ") {
 								isWithCarm = false
 								isPeri = false
 								lastIsWithCarm = false
@@ -949,9 +949,12 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					}
 				} else if c.buffer[i] == 's' {
 					if lastBlockInjection != nil {
-						sntCode := ".+999_s"
+						sntCode := constants.K_SINGLE_SNT
 						if lastBlockInjection.GetDirection() == "Both" {
-							sntCode = ".+999_sb"
+							eswtFocus := lastBlockInjection.GetEswtFocus()
+							if eswtFocus != "TPZ" && eswtFocus != "lower back" {
+								sntCode = constants.K_BOTH_SNT
+							}
 						}
 						if sntVal, exists := hotstrings.K_SonoStim[lastBlockBaseKey]; exists {
 							c.treatments.SetAddExtraTreatments(*sntVal)
