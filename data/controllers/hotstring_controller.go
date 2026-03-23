@@ -662,9 +662,12 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							remainderPos += 1
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetSonoStim() != "" {
-							sntCode := ".+999_s"
+							sntCode := constants.K_SINGLE_SNT
 							if inj.GetDirection() == "Both" {
-								sntCode = ".+999_sb"
+								eswtFocus := inj.GetEswtFocus()
+								if eswtFocus != "TPZ" && eswtFocus != "lower back" {
+									sntCode = constants.K_BOTH_SNT
+								}
 							}
 							snt := models.NewSonoStim(inj.GetDirection(), inj.GetSonoStim(), sntCode)
 							c.treatments.SetAddExtraTreatments(*snt)
