@@ -42,7 +42,8 @@ const (
 	K_BACKSPACE = "backspace"
 	K_DELETE    = "delete"
 
-	K_SAME_INPUT_MEMO_WINDOW = "same_input_memo_window"
+	K_SAME_INPUT_MEMO_WINDOW     = "same_input_memo_window"
+	K_SAME_INPUT_SPECIFIC_WINDOW = "same_input_specific_window"
 	// K_DELETE_FIRST_LINE      = "delete_first_line"
 	K_MOVE_CURSOR_TO_CHART_END = "move_cursor_to_end"
 	K_chart_window             = "chart_window"

@@ -363,6 +363,11 @@ var K_SonoStim = map[string]*models.SonoStim{
 	"ftl":  models.NewSonoStim(constants.K_LT, "lower leg (extensor digitorum longus)", constants.K_SINGLE_SNT),
 }
 
+var K_Manual = map[string]*models.Manual{
+	"m8":  models.NewManual("m8", ".+999_m8", nil),
+	"m13": models.NewManual("m13", ".+999_m13", nil),
+}
+
 var K_PainEraser = map[string]*models.PainEraser{
 	"tpb":  models.NewPainEraser(constants.K_BOTH, "TPZ", constants.K_PAIN_ERASER),
 	"tpr":  models.NewPainEraser(constants.K_RT, "TPZ", constants.K_PAIN_ERASER),
@@ -571,8 +576,6 @@ var K_SIMPLE_CODE = map[string]string{
 	"pt2":    ".+999_pt2",
 	"pt3":    ".+999_pt3",
 	"pt4":    ".+999_pt4",
-	"m8":     ".+3m8",
-	"m13":    ".+3m13",
 	"spakl":  ".+9al_4_2_ankle",
 	"spakr":  ".+9ar_4_2_ankle",
 	"spfil":  ".+9fl_3_1",

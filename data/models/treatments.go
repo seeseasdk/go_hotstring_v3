@@ -21,6 +21,7 @@ type Treatments struct {
 	followUp        string
 	clipboardMemos  []string
 	eSWT            ESWT
+	manual          Manual
 }
 
 func NewTreatments() *Treatments {
@@ -33,6 +34,7 @@ func NewTreatments() *Treatments {
 		followUp:        "",
 		clipboardMemos:  []string{},
 		eSWT:            *NewESWT("", "", "", "", false),
+		manual:          *NewManual("", "", nil),
 	}
 }
 func (i *Treatments) SetDay(day time.Time) {
@@ -63,6 +65,9 @@ func (i *Treatments) AddClipboardMemo(memo string) {
 }
 func (i *Treatments) SetESWT(eswt ESWT) {
 	i.eSWT = eswt
+}
+func (i *Treatments) SetManual(manual Manual) {
+	i.manual = manual
 }
 func (i *Treatments) SortInjections() {
 	sort.SliceStable(i.injections, func(a, b int) bool {
@@ -97,6 +102,7 @@ func (i *Treatments) SetReset() {
 	i.followUp = ""
 	i.clipboardMemos = []string{}
 	i.eSWT.SetReset()
+	i.manual.SetReset()
 	log.Debug("models/treatment.go", "treatment", "treatment reset")
 }
 func (i Treatments) GetDay() time.Time {
@@ -233,6 +239,9 @@ func (i Treatments) GetStandaloneFollowUpText() string {
 func (i Treatments) GetESWT() ESWT {
 	return i.eSWT
 }
+func (i Treatments) GetManual() Manual {
+	return i.manual
+}
 func (i Treatments) GetTextForChart() string {
 	var text string
 	p := ""
@@ -290,6 +299,9 @@ func (i Treatments) GetTextForChart() string {
 			text += "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 		}
 	}
+	if !i.manual.IsEmpty() {
+		text += "pt) " + i.manual.GetText() + "\n"
+	}
 	if len(i.extraTreatments) > 0 {
 		for _, extra := range i.extraTreatments {
 			switch extra := extra.(type) {
@@ -337,15 +349,93 @@ func (i Treatments) GetTextForChart() string {
 }
 func (i Treatments) GetTextForSpecific() string {
 	var text string
+	p := ""
 
-	// m8, m13 라인만 pt) 포맷으로 specificText에 추가
-	for _, memo := range i.clipboardMemos {
-		if memo == "m8" || memo == "m13" || strings.HasPrefix(memo, "m8 ") || strings.HasPrefix(memo, "m13 ") {
-			if !strings.Contains(text, "pt) ") {
-				text += "pt) " + memo + "\n"
+	carmTreat := ""
+	periTreat := ""
+
+	formattedDate := i.day.Format("2006-01-02")
+
+	for _, inject := range i.injections {
+		switch inject.isP {
+		case true:
+			p = "p"
+		default:
+			p = ""
+		}
+		// isN 처리 추가
+		if inject.isN {
+			p = "n"
+		}
+
+		switch inject.isWithCarm {
+		case true:
+			if carmTreat == "" {
+				carmTreat += formattedDate + " " + "c) " + inject.direction + " " + inject.site + " " + p + "\n"
 			} else {
-				text += "     " + memo + "\n"
+				if strings.Contains(inject.site, "caudal") {
+					carmTreat += "                    " + inject.site + " " + p + "\n"
+				} else {
+					carmTreat += "                    " + inject.direction + " " + inject.site + " " + p + "\n"
+				}
 			}
+		default:
+			if periTreat == "" && carmTreat == "" {
+				periTreat += formattedDate + " " + "s) " + inject.direction + " " + inject.site + " " + p + "\n"
+			} else if periTreat == "" && carmTreat != "" {
+				periTreat += "                " + "s) " + inject.direction + " " + inject.site + " " + p + "\n"
+			} else {
+				periTreat += "                   " + inject.direction + " " + inject.site + " " + p + "\n"
+			}
+		}
+	}
+
+	text += carmTreat
+	text += periTreat
+
+	if !i.eSWT.IsEmpty() {
+		if text == "" {
+			text += formattedDate + " "
+		} else {
+			text += "                "
+		}
+
+		switch i.eSWT.GetFeeType() {
+		case constants.K_NORMAL:
+			text += "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+		case constants.K_FREE:
+			text += "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+		case constants.K_FREE_RADIAL_ONLY:
+			text += "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+		}
+	}
+	if !i.manual.IsEmpty() {
+		if text == "" {
+			text += formattedDate + " "
+		} else {
+			text += "                "
+		}
+		text += "pt) " + i.manual.GetText() + "\n"
+	}
+	if len(i.extraTreatments) > 0 {
+		for _, extra := range i.extraTreatments {
+			switch extra := extra.(type) {
+			case SonoStim:
+				text += "                snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+			case PainEraser:
+				text += "                pe) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+			}
+		}
+	}
+
+	// 클립보드 매모(복사한 텍스트)를 specificText에 추가 반영
+	for _, memo := range i.clipboardMemos {
+		if text == "" {
+			text += formattedDate + " " + memo + "\n"
+		} else {
+			text += "                " + memo + "\n"
 		}
 	}
 
@@ -627,6 +717,9 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 			return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 		}
 	}
+	if !i.manual.IsEmpty() {
+		result = append(result, i.manual.code)
+	}
 	return result, nil
 }
 func (i Treatments) IsEmpty() bool {
@@ -634,7 +727,7 @@ func (i Treatments) IsEmpty() bool {
 		i.drug == "" &&
 		i.followUp == "" &&
 		i.eSWT.IsEmpty() && len(i.extraTreatments) == 0 && !i.isP &&
-		len(i.clipboardMemos) == 0
+		len(i.clipboardMemos) == 0 && i.manual.IsEmpty()
 }
 func (i Treatments) ToString() string {
 	var treatTemp string
@@ -659,5 +752,6 @@ func (i Treatments) ToString() string {
 		" isP: " + fmt.Sprintf("%v", i.isP) +
 		" drug: " + i.drug +
 		" followUp: " + i.followUp +
-		" addESWT: " + i.eSWT.ToString()
+		" addESWT: " + i.eSWT.ToString() +
+		" manual: " + i.manual.ToString()
 }

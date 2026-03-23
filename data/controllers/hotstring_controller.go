@@ -344,6 +344,24 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			}
 		}
 	}
+	// m으로 시작하되 K_Simples/K_SIMPLE_CODE 키가 먼저 매칭되면 일반 모드로 처리
+	isManualMode := strings.HasPrefix(c.buffer, "m")
+	if isManualMode {
+		for k := range hotstrings.K_SIMPLE_CODE {
+			if strings.HasPrefix(c.buffer, k) {
+				isManualMode = false
+				break
+			}
+		}
+	}
+	if isManualMode {
+		for k := range hotstrings.K_Simples {
+			if strings.HasPrefix(c.buffer, k) {
+				isManualMode = false
+				break
+			}
+		}
+	}
 
 	if isFirstMeetingMode {
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting만 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
@@ -409,6 +427,13 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				actualPos := idx + foundIdx
 				matches = append(matches, Match{actualPos, len(k), "Sonos", k, k, v})
 				idx = actualPos + len(k)
+			}
+		}
+	} else if isManualMode {
+		// m으로 시작하면 K_Manual에서 전체 키(m8, m13 등)로 검색
+		for k, v := range hotstrings.K_Manual {
+			if idx := strings.Index(c.buffer, k); idx != -1 {
+				matches = append(matches, Match{idx, len(k), "Manual", k, k, v})
 			}
 		}
 	} else {
@@ -528,6 +553,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var etcOrderCodes []string
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
+	var matchedXrayBaseKeys []string
 
 	// 다음 매치의 시작 위치 집합: suffix 루프에서 다음 매치를 잘못 소비하지 않도록
 	matchStartPositions := make(map[int]bool)
@@ -701,6 +727,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						output.SetChartText(xray.GetText())
 					}
 					output.AddOrderCode(xray.GetCode())
+					matchedXrayBaseKeys = append(matchedXrayBaseKeys, match.baseKey)
 				}
 			case "Sonos":
 				slog.Debug("Hotstring Triggered (Sonos)", "trigger", match.key)
@@ -790,6 +817,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				val, ok := match.value.(string)
 				if ok {
 					c.treatments.SetFollowUp(val)
+				}
+			case "Manual":
+				slog.Debug("Hotstring Triggered (Manual)", "trigger", match.key)
+				manual, ok := match.value.(*models.Manual)
+				if ok {
+					c.treatments.SetManual(*manual)
+					output.AddOrderCode(manual.GetCode())
+					output.AddOrderCode(".+999_pt1")
 				}
 			}
 		}
@@ -907,6 +942,24 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// 모드 프리픽스 문자(z/x/s)는 별도로 processed에 표시
 	if isFirstMeetingMode || isXrayMode || isSonoMode {
 		processed[0] = true
+	}
+
+	// xray 모드에서 trailing 's'가 미처리 상태이면 → 매칭된 모든 xray 키에 대해 K_Sonos도 추가
+	if isXrayMode && len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
+		lastPos := len(c.buffer) - 1
+		processed[lastPos] = true
+		for _, key := range matchedXrayBaseKeys {
+			if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
+				slog.Debug("Hotstring Triggered (Xray trailing-s Sono)", "key", key)
+				curChart := output.GetChartText()
+				if curChart != "" {
+					output.SetChartText(curChart + "\n" + sonoVal.GetText())
+				} else {
+					output.SetChartText(sonoVal.GetText())
+				}
+				output.AddOrderCode(sonoVal.GetCode())
+			}
+		}
 	}
 
 	// 매칭되지 않은 문자가 있으면 트리거 전체 취소 (100% 매칭이 되어야 출력)
@@ -1032,6 +1085,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
+		// specificText에도 pt) 추가 (16칸 빈칸)
+		spec := output.GetSpecificText()
+		specInsert := "pt) 자기장\n"
+		if spec != "" {
+			output.SetSpecificText(spec + "                " + specInsert)
+		} else {
+			output.SetSpecificText(specInsert)
+		}
 	}
 
 	// ctrl+enter 트리거 시 주사 조합 이상 여부 경고
@@ -1051,16 +1112,16 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			hasLumbar := isLumbarSpineInj(first.GetSite()) || isLumbarSpineInj(second.GetSite())
 			hasUpper := isUpperLimbInj(first.GetSite()) || isUpperLimbInj(second.GetSite())
 			if hasLumbar && hasUpper {
-				warnings = append(warnings, "⚠ 요추치료 + 상지주사 조합 경고")
-				warnings = append(warnings, "⚠ 처방을 다시 확인하세요")
+				warnings = append(warnings, "★★★ 요추치료 + 상지주사 조합 경고")
+				warnings = append(warnings, "★★★ 처방을 다시 확인하세요")
 			}
 
 			// Rule 2: 경추 치료 + 하지 주사
 			hasCervical := isCervicalSpineInj(first.GetSite()) || isCervicalSpineInj(second.GetSite())
 			hasLower := isLowerLimbInj(first.GetSite()) || isLowerLimbInj(second.GetSite())
 			if hasCervical && hasLower {
-				warnings = append(warnings, "⚠ 경추치료 + 하지주사 조합 경고")
-				warnings = append(warnings, "⚠ 처방을 다시 확인하세요")
+				warnings = append(warnings, "★★★ 경추치료 + 하지주사 조합 경고")
+				warnings = append(warnings, "★★★ 처방을 다시 확인하세요")
 			}
 
 			// Rule 3: 첫번째와 두번째 주사 방향 불일치
@@ -1069,8 +1130,8 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			if firstDir != "" && secondDir != "" &&
 				firstDir != "Both" && secondDir != "Both" &&
 				firstDir != secondDir {
-				warnings = append(warnings, "⚠ 주사 방향 불일치 경고")
-				warnings = append(warnings, "⚠ "+firstDir+" vs "+secondDir)
+				warnings = append(warnings, "★★★ 주사 방향 불일치 경고")
+				warnings = append(warnings, "★★★ "+firstDir+" vs "+secondDir)
 			}
 
 			if len(warnings) > 0 {
