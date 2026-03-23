@@ -561,6 +561,21 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		matchStartPositions[m.position] = true
 	}
 
+	// peri-p 컨텍스트 감지: 첫 번째 Blocks 매치의 키가 'p'로 시작하고 isWithCarm=false이면 true
+	// 이 경우 이후 isWithCarm=true 인젝션은 p-prefix 버전으로 대체하거나 isWithCarm=false로 강제,
+	// etc(추가 주사)의 isWithCarm=true는 건너뜀
+	isPeriPContext := false
+	for _, m := range matches {
+		if m.category == "Blocks-Direct" || m.category == "Blocks-C" || m.category == "Blocks-P" {
+			if inj, ok := m.value.(*models.Injection); ok {
+				if strings.HasPrefix(m.key, "p") && !inj.GetIsWithCarm() {
+					isPeriPContext = true
+				}
+			}
+			break
+		}
+	}
+
 	for _, match := range matches {
 		// 이미 처리된 부분과 겹치는지 확인
 		overlap := false
@@ -743,6 +758,18 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				}
 			case "Blocks-Direct", "Blocks-C", "Blocks-P":
 				injection := match.value.(*models.Injection)
+
+				// isPeriPContext: isWithCarm=true인 injection을 p-prefix 버전으로 대체하거나 isWithCarm=false로 강제
+				if isPeriPContext && injection.GetIsWithCarm() {
+					if pInj, exists := hotstrings.K_Blocks["p"+match.key]; exists && !pInj.GetIsWithCarm() {
+						injection = pInj
+					} else {
+						injCopy := *injection
+						injCopy.SetIsWithCarm(false)
+						injection = &injCopy
+					}
+				}
+
 				slog.Debug("Hotstring Triggered (Blocks)", "trigger", match.key, "site", injection.GetSite())
 				injKey := injection.GetDirection() + "|" + injection.GetSite()
 				if addedInjectionKeys[injKey] {
@@ -754,6 +781,10 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					// etc 필드 처리: *Injection 이면 추가 주사, string 이면 오더코드
 					switch etcVal := injection.GetEtc().(type) {
 					case *models.Injection:
+						// isPeriPContext이면 isWithCarm=true인 etc injection은 건너뜀
+						if isPeriPContext && etcVal.GetIsWithCarm() {
+							break
+						}
 						etcKey := etcVal.GetDirection() + "|" + etcVal.GetSite()
 						if addedInjectionKeys[etcKey] {
 							slog.Error("[DUPLICATE] etc injection already added", "key", etcKey, "buffer", c.buffer)
