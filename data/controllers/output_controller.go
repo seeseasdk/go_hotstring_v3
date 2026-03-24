@@ -237,6 +237,12 @@ func (c *OutputController) Start() {
 						time.Sleep(50 * time.Millisecond)
 						robotgo.Move(coord.X, coord.Y)
 						robotgo.Click("left")
+						time.Sleep(50 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "down")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyTap("end")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "up")
 					}
 				}
 

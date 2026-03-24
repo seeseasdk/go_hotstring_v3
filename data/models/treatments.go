@@ -385,7 +385,7 @@ func (i Treatments) GetTextForSpecific() string {
 			} else if periTreat == "" && carmTreat != "" {
 				periTreat += "                " + "s) " + inject.direction + " " + inject.site + " " + p + "\n"
 			} else {
-				periTreat += "                   " + inject.direction + " " + inject.site + " " + p + "\n"
+				periTreat += "                    " + inject.direction + " " + inject.site + " " + p + "\n"
 			}
 		}
 	}

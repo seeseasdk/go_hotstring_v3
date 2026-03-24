@@ -857,7 +857,6 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				manual, ok := match.value.(*models.Manual)
 				if ok {
 					c.treatments.SetManual(*manual)
-					output.AddOrderCode(manual.GetCode())
 					output.AddOrderCode(".+999_pt1")
 				}
 			}
@@ -1122,14 +1121,6 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			ct = insert
 		}
 		output.SetChartText(ct)
-		// specificText에도 pt) 추가 (16칸 빈칸)
-		spec := output.GetSpecificText()
-		specInsert := "pt) 자기장\n"
-		if spec != "" {
-			output.SetSpecificText(spec + "                " + specInsert)
-		} else {
-			output.SetSpecificText(specInsert)
-		}
 	}
 
 	// ctrl+enter 트리거 시 주사 조합 이상 여부 경고
