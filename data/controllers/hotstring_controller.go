@@ -998,6 +998,16 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 	}
 
+	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmy]? 패턴을 duration으로 처리하여 processed에 표시
+	if isFirstMeetingMode {
+		durationRe := regexp.MustCompile(`f(\d+[dmy]?)`)
+		if durLoc := durationRe.FindStringIndex(c.buffer); durLoc != nil {
+			for pos := durLoc[0]; pos < durLoc[1]; pos++ {
+				processed[pos] = true
+			}
+		}
+	}
+
 	// 매칭되지 않은 문자가 있으면 트리거 전체 취소 (100% 매칭이 되어야 출력)
 	var unmatched strings.Builder
 	for i := 0; i < len(c.buffer); i++ {
