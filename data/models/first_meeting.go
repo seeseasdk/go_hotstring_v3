@@ -8,8 +8,9 @@ type FirstMeeting struct {
 	sites        []string
 	duration     string
 	xray         []Xray
-	physicalExam string // 물리적 검사
-	extraExam    []any  // 추가적인 검사
+	physicalExam string   // 물리적 검사
+	extraExam    []any    // 추가적인 검사
+	pmhxItems    []string // pmhx 항목 (DM, HTN 등)
 }
 
 func NewFirstMeeting(site []string, pe string, xray []Xray, extraExam []any) *FirstMeeting {
@@ -185,6 +186,18 @@ func (fm *FirstMeeting) SetReset() {
 	fm.physicalExam = ""
 	fm.xray = []Xray{}
 	fm.extraExam = []any{}
+	fm.pmhxItems = []string{}
+}
+func (fm *FirstMeeting) AddPmhxItem(item string) {
+	for _, existing := range fm.pmhxItems {
+		if existing == item {
+			return
+		}
+	}
+	fm.pmhxItems = append(fm.pmhxItems, item)
+}
+func (fm *FirstMeeting) GetPmhxItems() []string {
+	return fm.pmhxItems
 }
 func (fm FirstMeeting) GetChartText() string {
 	var temp string
@@ -235,7 +248,11 @@ func (fm FirstMeeting) GetChartText() string {
 		}
 	}
 
-	temp += "pmhx: (-)" + "\n"
+	if len(fm.pmhxItems) > 0 {
+		temp += "pmhx: " + strings.Join(fm.pmhxItems, ", ") + "\n"
+	} else {
+		temp += "pmhx: (-)" + "\n"
+	}
 	temp += " " + "\n" //빈칸이라도 들어가야 \n이 엔터로 들어갑니다, 버그?
 	temp += xr
 	if extra != "" {

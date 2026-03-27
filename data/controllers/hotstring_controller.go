@@ -364,7 +364,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	if isFirstMeetingMode {
-		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting만 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
+		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting + K_Simples을 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
 		for k, v := range hotstrings.K_FirstMeeting {
 			idx := 1 // 'z' 이후부터 검색
 			for {
@@ -377,6 +377,22 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				}
 				actualPos := idx + foundIdx
 				matches = append(matches, Match{actualPos, len(k), "FirstMeeting", k, k, v})
+				idx = actualPos + len(k)
+			}
+		}
+		// z모드에서도 K_Simples 검색 (mm, hh, dd 등 → pmhx 처리)
+		for k, v := range hotstrings.K_Simples {
+			idx := 1 // 'z' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], k)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(k), "Simples", k, k, v})
 				idx = actualPos + len(k)
 			}
 		}
@@ -522,6 +538,28 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				value:    valStr,
 			})
 		}
+	}
+
+	// Blocks 매치가 있을 때 p+숫자 패턴의 Simples 매치(예: p7 → "PRS 7")는 제거:
+	// 이 경우 'p'는 leftoverP(isP=true), 숫자는 leftover 숫자로 처리되어야 함
+	hasBlocksInMatches := false
+	for _, m := range matches {
+		if m.category == "Blocks-Direct" || m.category == "Blocks-C" || m.category == "Blocks-P" {
+			hasBlocksInMatches = true
+			break
+		}
+	}
+	if hasBlocksInMatches {
+		pDigitRe := regexp.MustCompile(`^p\d+$`)
+		filtered := matches[:0]
+		for _, m := range matches {
+			if m.category == "Simples" && pDigitRe.MatchString(m.key) {
+				slog.Debug("Skipping p+digit Simples match due to Blocks context", "key", m.key)
+				continue
+			}
+			filtered = append(filtered, m)
+		}
+		matches = filtered
 	}
 
 	// 위치 순으로 정렬 (앞에서부터), 같은 위치면 긴 것이 우선 (Longest match first)
@@ -829,14 +867,29 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						output.SetErrorMsg("중복된 항목: " + simple.GetText())
 					} else {
 						addedSimpleTexts[simple.GetText()] = true
-						curSimple := output.GetSimpleText()
-						if curSimple != "" {
-							output.SetSimpleText(curSimple + ", " + simple.GetText())
+						if isFirstMeetingMode {
+							// z모드: pmhx 항목으로 수집 (combinedFirstMeeting이 없으면 나중에 생성)
+							if combinedFirstMeeting == nil {
+								combinedFirstMeeting = models.NewFirstMeeting([]string{}, "", []models.Xray{}, []any{})
+							}
+							combinedFirstMeeting.AddPmhxItem(simple.GetText())
+							// memoText에도 추가
+							curMemo := output.GetMemoText()
+							if curMemo != "" {
+								output.SetMemoText(curMemo + ", " + simple.GetText())
+							} else {
+								output.SetMemoText(simple.GetText())
+							}
 						} else {
-							output.SetSimpleText(simple.GetText())
-						}
-						if simple.GetExtraDo() != "" {
-							output.SetExtraDo(simple.GetExtraDo())
+							curSimple := output.GetSimpleText()
+							if curSimple != "" {
+								output.SetSimpleText(curSimple + ", " + simple.GetText())
+							} else {
+								output.SetSimpleText(simple.GetText())
+							}
+							if simple.GetExtraDo() != "" {
+								output.SetExtraDo(simple.GetExtraDo())
+							}
 						}
 					}
 				}
@@ -998,9 +1051,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 	}
 
-	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmy]? 패턴을 duration으로 처리하여 processed에 표시
+	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmyw]? 패턴을 duration으로 처리하여 processed에 표시
 	if isFirstMeetingMode {
-		durationRe := regexp.MustCompile(`f(\d+[dmy]?)`)
+		durationRe := regexp.MustCompile(`f(\d+[dmyw]?)`)
 		if durLoc := durationRe.FindStringIndex(c.buffer); durLoc != nil {
 			for pos := durLoc[0]; pos < durLoc[1]; pos++ {
 				processed[pos] = true
