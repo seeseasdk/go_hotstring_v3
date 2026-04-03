@@ -256,7 +256,7 @@ func (fm FirstMeeting) GetChartText() string {
 	temp += " " + "\n" //빈칸이라도 들어가야 \n이 엔터로 들어갑니다, 버그?
 	temp += xr
 	if extra != "" {
-		temp += extra + "\n"
+		temp += extra
 	}
 	temp += " " + "\n" //빈칸이라도 들어가야 \n이 엔터로 들어갑니다
 	return temp
