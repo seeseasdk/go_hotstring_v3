@@ -83,7 +83,7 @@ func (c *OutputController) Start() {
 						}
 
 						// 키보드 입력을 통해 글자 입력 (로봇고 사용)
-						robotgo.TypeStr(chartText)
+						robotgo.TypeStr(strings.TrimRight(chartText, " \t\r\n") + "\n")
 						time.Sleep(50 * time.Millisecond)
 					}
 				}
@@ -232,7 +232,7 @@ func (c *OutputController) Start() {
 				c.cc.InputChan <- models.NewChannelStuff("OutputController", "HotstringController", "ClearBuffer", false, nil)
 
 				// Ctrl+Enter 트리거이면 항상 chartWindow로 커서 복귀
-				if !output.GetIsClipboard() {
+				if !output.GetIsClipboard() && output.GetSimpleText() == "" {
 					if coord, exists := hotstrings.K_Coordinates["chartWindow"]; exists {
 						time.Sleep(50 * time.Millisecond)
 						robotgo.Move(coord.X, coord.Y)
