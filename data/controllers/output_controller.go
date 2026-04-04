@@ -246,6 +246,16 @@ func (c *OutputController) Start() {
 					}
 				}
 
+				// Ctrl+* 트리거이면 마지막에 Ctrl + - 버튼 클릭
+				if output.GetIsClipboard() {
+					time.Sleep(50 * time.Millisecond)
+					robotgo.KeyToggle("ctrl", "down")
+					time.Sleep(10 * time.Millisecond)
+					robotgo.KeyTap("-")
+					time.Sleep(10 * time.Millisecond)
+					robotgo.KeyToggle("ctrl", "up")
+				}
+
 				// Send reset signal to clear
 				c.cc.ResetChan <- true
 				slog.Info("OutputController: Reset signal sent")

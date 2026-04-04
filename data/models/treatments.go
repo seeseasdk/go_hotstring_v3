@@ -456,8 +456,13 @@ func (i Treatments) GetTextForMx999() string {
 				inject.SetSite(inject.site[:len(inject.site)-2])
 			}
 		}
-		// log.Error(inject.site[:len(inject.site)-2])
-		// log.Error(inject.ToString())
+
+		// Ctrl+* 클립보드 트리거에서 s) knee IA 라인이면 대퇴신경차단술(무릎) + 좌골신경차단술(대퇴) 직접 출력
+		if inject.isFromClipboard && !inject.isWithCarm && inject.site == "knee IA" {
+			text += inject.direction + " 대퇴신경차단술(무릎)\n"
+			text += inject.direction + " 좌골신경차단술(대퇴)\n"
+			continue
+		}
 
 		switch inject.code {
 		case constants.K_SHB, constants.K_SH, constants.K_PSHB, constants.K_PSH:
