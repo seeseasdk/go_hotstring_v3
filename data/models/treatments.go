@@ -442,6 +442,7 @@ func (i Treatments) GetTextForSpecific() string {
 		} else {
 			eswtPrefix = "                "
 		}
+		eswtBlankPrefix := strings.Repeat(" ", len(eswtPrefix))
 		contCont := strings.Repeat(" ", len(eswtPrefix)+22)   // focus 계속줄 들여쓰기 (+10)
 		radialCont := strings.Repeat(" ", len(eswtPrefix)+22) // radial 계속줄 들여쓰기 (+9)
 
@@ -451,7 +452,7 @@ func (i Treatments) GetTextForSpecific() string {
 			for _, e := range extraEswts {
 				text += contCont + e.GetDirection() + " " + e.GetFocus() + "\n"
 			}
-			text += eswtPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtBlankPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 			for _, e := range extraEswts {
 				text += radialCont + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
@@ -460,7 +461,7 @@ func (i Treatments) GetTextForSpecific() string {
 			for _, e := range extraEswts {
 				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetFocus() + "\n"
 			}
-			text += eswtPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtBlankPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 			for _, e := range extraEswts {
 				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
