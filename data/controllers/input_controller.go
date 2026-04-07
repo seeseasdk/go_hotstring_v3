@@ -239,7 +239,6 @@ func (c *InputController) Start() {
 			}
 			// 일반 Enter (VK_RETURN=13) - buffer 초기화
 			if !ctrlPressed && ev.Rawcode == 13 {
-				slog.Debug("[ENTER] Buffer cleared!")
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -250,9 +249,20 @@ func (c *InputController) Start() {
 				continue
 			}
 
-			// Space (VK_SPACE=32) - buffer 초기화
+			// Home (VK_HOME=36), End (VK_END=35), Shift+Home, Shift+End - buffer 초기화
+			if ev.Rawcode == 35 || ev.Rawcode == 36 {
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"ClearBuffer",
+					false,
+					nil,
+				)
+				continue
+			}
+
+			// Space (VK_SPACE=32), 방향키/PgUp/PgDn (33~34, 37~40), Delete(46) - buffer 초기화
 			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 40) || ev.Rawcode == 46 {
-				slog.Debug("[SPACE] Buffer cleared!")
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -311,6 +321,10 @@ func (c *InputController) Start() {
 			// Ctrl 키 떼면 상태 원복
 			if ev.Rawcode == 17 || ev.Rawcode == 162 || ev.Rawcode == 163 {
 				ctrlPressed = false
+			}
+			// Shift 키 떼면 상태 원복
+			if ev.Rawcode == 16 || ev.Rawcode == 160 || ev.Rawcode == 161 {
+				shiftPressed = false
 			}
 		}
 	}

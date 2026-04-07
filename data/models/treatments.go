@@ -54,6 +54,11 @@ func (i *Treatments) SetAllInjectionsIsP(isP bool) {
 		i.injections[idx].SetIsP(isP) // assuming Injection has SetIsP, else i.injections[idx].isP = isP
 	}
 }
+func (i *Treatments) SetAllInjectionsIsN(isN bool) {
+	for idx := range i.injections {
+		i.injections[idx].SetIsN(isN)
+	}
+}
 func (i *Treatments) SetDrug(drugDays string) {
 	i.drug = drugDays
 }
@@ -288,21 +293,44 @@ func (i Treatments) GetTextForChart() string {
 	text += periTreat
 
 	if !i.eSWT.IsEmpty() {
+		// extraTreatments 중 추가 ESWT 항목 수집 (렌더링 후 skip)
+		var extraEswts []ESWT
+		for _, extra := range i.extraTreatments {
+			if e, ok := extra.(ESWT); ok {
+				extraEswts = append(extraEswts, e)
+			}
+		}
 		switch i.eSWT.GetFeeType() {
 		case constants.K_NORMAL:
 			text += "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			for _, e := range extraEswts {
+				text += "                " + e.GetDirection() + " " + e.GetFocus() + "\n"
+			}
 			text += "   radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += "                " + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		case constants.K_FREE:
 			text += "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			for _, e := range extraEswts {
+				text += "                 " + e.GetDirection() + " " + e.GetFocus() + "\n"
+			}
 			text += "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += "                 " + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		case constants.K_FREE_RADIAL_ONLY:
 			text += "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += "                 " + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		}
 	}
 	if !i.manual.IsEmpty() {
 		text += "pt) " + i.manual.GetText() + "\n"
 	}
 	if len(i.extraTreatments) > 0 {
+		sntStarted := false
 		for _, extra := range i.extraTreatments {
 			switch extra := extra.(type) {
 			case string:
@@ -316,9 +344,16 @@ func (i Treatments) GetTextForChart() string {
 				}
 				text += fmt.Sprintf("%v", extra) + "\n"
 			case SonoStim:
-				text += "snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+				if !sntStarted {
+					text += "snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+					sntStarted = true
+				} else {
+					text += "      " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+				}
 			case PainEraser:
 				text += "pe) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+			case ESWT:
+				// eSWT 블록에서 이미 렌더링됨 - skip
 			}
 		}
 	}
@@ -394,22 +429,49 @@ func (i Treatments) GetTextForSpecific() string {
 	text += periTreat
 
 	if !i.eSWT.IsEmpty() {
-		if text == "" {
-			text += formattedDate + " "
-		} else {
-			text += "                "
+		// extraTreatments 중 추가 ESWT 항목 수집
+		var extraEswts []ESWT
+		for _, extra := range i.extraTreatments {
+			if e, ok := extra.(ESWT); ok {
+				extraEswts = append(extraEswts, e)
+			}
 		}
+		var eswtPrefix string
+		if text == "" {
+			eswtPrefix = formattedDate + " "
+		} else {
+			eswtPrefix = "                "
+		}
+		contCont := strings.Repeat(" ", len(eswtPrefix)+22)   // focus 계속줄 들여쓰기 (+10)
+		radialCont := strings.Repeat(" ", len(eswtPrefix)+22) // radial 계속줄 들여쓰기 (+9)
 
 		switch i.eSWT.GetFeeType() {
 		case constants.K_NORMAL:
-			text += "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
-			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtPrefix + "e) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			for _, e := range extraEswts {
+				text += contCont + e.GetDirection() + " " + e.GetFocus() + "\n"
+			}
+			text += eswtPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += radialCont + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		case constants.K_FREE:
-			text += "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
-			text += "                    " + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtPrefix + "ef) focus on " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + "\n"
+			for _, e := range extraEswts {
+				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetFocus() + "\n"
+			}
+			text += eswtPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		case constants.K_FREE_RADIAL_ONLY:
-			text += "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtPrefix + "ef) radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			for _, e := range extraEswts {
+				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetRadial() + "\n"
+			}
 		}
+		_ = contCont
+		_ = radialCont
 	}
 	if !i.manual.IsEmpty() {
 		if text == "" {
@@ -420,12 +482,20 @@ func (i Treatments) GetTextForSpecific() string {
 		text += "pt) " + i.manual.GetText() + "\n"
 	}
 	if len(i.extraTreatments) > 0 {
+		sntStarted := false
 		for _, extra := range i.extraTreatments {
 			switch extra := extra.(type) {
 			case SonoStim:
-				text += "                snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+				if !sntStarted {
+					text += "                snt) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+					sntStarted = true
+				} else {
+					text += "                      " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+				}
 			case PainEraser:
 				text += "                pe) " + extra.GetDirection() + " " + extra.GetSite() + "\n"
+			case ESWT:
+				// eSWT 블록에서 이미 렌더링됨 - skip
 			}
 		}
 	}
@@ -669,6 +739,23 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		result = append(result, injectCode)
 	}
 
+	// extraTreatments 중 ESWT/SonoStim 개수 미리 세기
+	extraEswtCount := 0
+	extraSntCount := 0
+	for _, extra := range i.extraTreatments {
+		switch extra.(type) {
+		case ESWT:
+			extraEswtCount++
+		case SonoStim:
+			extraSntCount++
+		}
+	}
+	totalEswtCount := extraEswtCount
+	if !i.eSWT.IsEmpty() {
+		totalEswtCount++
+	}
+
+	sntCodeAdded := false
 	for _, extra := range i.extraTreatments {
 		switch extra := extra.(type) {
 		case string:
@@ -680,13 +767,22 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 			}
 		case SonoStim:
 			if !extra.IsEmpty() {
-				code := extra.GetCode()
-				if code != "" {
-					result = append(result, code)
-				} else if extra.GetDirection() == "both" {
-					result = append(result, constants.K_BOTH_SNT)
+				if extraSntCount >= 2 {
+					// 2개 이상 SonoStim → K_BOTH_SNT 한 번만 출력
+					if !sntCodeAdded {
+						result = append(result, constants.K_BOTH_SNT)
+						sntCodeAdded = true
+					}
+					// 이후 항목은 skip
 				} else {
-					result = append(result, constants.K_SINGLE_SNT)
+					code := extra.GetCode()
+					if code != "" {
+						result = append(result, code)
+					} else if extra.GetDirection() == constants.K_BOTH {
+						result = append(result, constants.K_BOTH_SNT)
+					} else {
+						result = append(result, constants.K_SINGLE_SNT)
+					}
 				}
 			}
 		case PainEraser:
@@ -694,32 +790,48 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 				code := extra.GetCode()
 				if code != "" {
 					result = append(result, code)
-				} else if extra.GetDirection() == "both" {
+				} else if extra.GetDirection() == constants.K_BOTH {
 					result = append(result, constants.K_BOTH_PAIN_ERASER)
 				} else {
 					result = append(result, constants.K_SINGLE_PAIN_ERASER)
 				}
 			}
+		case ESWT:
+			// ESWT는 아래 eSWT 블록에서 일괄 처리
 		}
 	}
 	if !i.eSWT.IsEmpty() {
-		switch i.eSWT.GetFeeType() {
-		case constants.K_NORMAL:
-			if i.eSWT.GetDirection() == constants.K_BOTH {
-				if i.eSWT.GetFocus() == "TPZ" || i.eSWT.GetFocus() == "lower back" {
-					result = append(result, constants.K_SINGLE_ESWT)
-				} else {
-					result = append(result, constants.K_BOTH_ESWT)
-				}
-			} else {
-				result = append(result, constants.K_SINGLE_ESWT)
+		if totalEswtCount >= 2 {
+			// 2개 이상 ESWT → feeType에 따라 K_BOTH_ESWT 또는 복수 free 코드 한 번만 출력
+			switch i.eSWT.GetFeeType() {
+			case constants.K_NORMAL:
+				result = append(result, constants.K_BOTH_ESWT)
+			case constants.K_FREE:
+				result = append(result, constants.K_ESWT_FREE)
+			case constants.K_FREE_RADIAL_ONLY:
+				result = append(result, constants.K_ESWT_FREE_RADIAL)
+			default:
+				return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 			}
-		case constants.K_FREE:
-			result = append(result, constants.K_ESWT_FREE)
-		case constants.K_FREE_RADIAL_ONLY:
-			result = append(result, constants.K_ESWT_FREE_RADIAL)
-		default:
-			return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
+		} else {
+			switch i.eSWT.GetFeeType() {
+			case constants.K_NORMAL:
+				if i.eSWT.GetDirection() == constants.K_BOTH {
+					if i.eSWT.GetFocus() == "TPZ" || i.eSWT.GetFocus() == "lower back" {
+						result = append(result, constants.K_SINGLE_ESWT)
+					} else {
+						result = append(result, constants.K_BOTH_ESWT)
+					}
+				} else {
+					result = append(result, constants.K_SINGLE_ESWT)
+				}
+			case constants.K_FREE:
+				result = append(result, constants.K_ESWT_FREE)
+			case constants.K_FREE_RADIAL_ONLY:
+				result = append(result, constants.K_ESWT_FREE_RADIAL)
+			default:
+				return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
+			}
 		}
 	}
 	if !i.manual.IsEmpty() {
@@ -747,6 +859,8 @@ func (i Treatments) ToString() string {
 		case SonoStim:
 			extraTemp += extra.ToString()
 		case PainEraser:
+			extraTemp += extra.ToString()
+		case ESWT:
 			extraTemp += extra.ToString()
 		}
 	}

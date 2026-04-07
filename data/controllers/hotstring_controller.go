@@ -1,4 +1,4 @@
-package controllers
+﻿package controllers
 
 import (
 	"log/slog"
@@ -207,7 +207,6 @@ func (c *HotstringController) Start() {
 				// MuteStart message processing - TypeStr 출력 중 버퍼 추가 차단 시작
 				if stuff.Do == "MuteStart" {
 					c.isMuting = true
-					slog.Debug("[BUFFER] muting started")
 					continue
 				}
 
@@ -215,7 +214,6 @@ func (c *HotstringController) Start() {
 				if stuff.Do == "ClearBuffer" {
 					c.buffer = ""
 					c.isMuting = false
-					slog.Debug("[BUFFER] cleared and unmuted")
 					continue
 				}
 
@@ -362,6 +360,24 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			}
 		}
 	}
+	// e로 시작하더라도 K_SIMPLE_CODE, K_Simples 키가 버퍼 앞에서부터 매칭되면 일반 모드로 처리
+	isEswtMode := strings.HasPrefix(c.buffer, "e")
+	if isEswtMode {
+		for k := range hotstrings.K_SIMPLE_CODE {
+			if strings.HasPrefix(c.buffer, k) {
+				isEswtMode = false
+				break
+			}
+		}
+	}
+	if isEswtMode {
+		for k := range hotstrings.K_Simples {
+			if strings.HasPrefix(c.buffer, k) {
+				isEswtMode = false
+				break
+			}
+		}
+	}
 
 	if isFirstMeetingMode {
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting + K_Simples을 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
@@ -450,6 +466,23 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		for k, v := range hotstrings.K_Manual {
 			if idx := strings.Index(c.buffer, k); idx != -1 {
 				matches = append(matches, Match{idx, len(k), "Manual", k, k, v})
+			}
+		}
+	} else if isEswtMode {
+		// e로 시작하면 K_ESWT_ONLY에서만 찾는다 (연속 다부위 지원, 예: elvbshls → lvb eswt + shl eswt)
+		for k, v := range hotstrings.K_ESWT_ONLY {
+			idx := 1 // 'e' 이후부터 검색
+			for {
+				if idx >= len(c.buffer) {
+					break
+				}
+				foundIdx := strings.Index(c.buffer[idx:], k)
+				if foundIdx == -1 {
+					break
+				}
+				actualPos := idx + foundIdx
+				matches = append(matches, Match{actualPos, len(k), "ESWT_MODE", k, k, v})
+				idx = actualPos + len(k)
 			}
 		}
 	} else {
@@ -592,6 +625,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
 	var matchedXrayBaseKeys []string
+	var matchedEswtBaseKeys []string
 
 	// 다음 매치의 시작 위치 집합: suffix 루프에서 다음 매치를 잘못 소비하지 않도록
 	matchStartPositions := make(map[int]bool)
@@ -632,7 +666,8 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 
 			// 접미사 'e', 's', 'pe'가 있는지 확인 (각각 ESWT, SonoStim, PainEraser 처리를 추가하기 위함)
 			// 여러 접미사가 연달아 올 수 처리 (예: ...pes, ...espe)
-			if match.category != "Sonos" && match.category != "Xrays" && match.category != "FirstMeeting" {
+			// ESWT_MODE는 trailing 's'로 trailing sonostim을 일괄 처리하므로 suffix loop 제외
+			if match.category != "Sonos" && match.category != "Xrays" && match.category != "FirstMeeting" && match.category != "ESWT_MODE" {
 				remainderPos := match.position + match.length
 				for remainderPos < len(c.buffer) && !processed[remainderPos] {
 					// 현재 위치가 다른 매치의 시작 위치라면 이 match의 suffix 처리를 중단
@@ -653,7 +688,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							remainderPos += 2
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
-							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), constants.K_FREE, false)
+							useInj := inj
+							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
+								useInj = lastBlockInjection
+							}
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE, false)
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -671,7 +710,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							remainderPos += 2
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
-							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
+							useInj := inj
+							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
+								useInj = lastBlockInjection
+							}
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -686,7 +729,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							remainderPos += 1
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
-							eswt := models.NewESWT(inj.GetDirection(), inj.GetEswtFocus(), inj.GetEswtRadial(), "normal", false)
+							useInj := inj
+							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
+								useInj = lastBlockInjection
+							}
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), "normal", false)
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							remainderPos += 1
@@ -756,6 +803,15 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			case "ESWT":
 				slog.Debug("Hotstring Triggered (ESWT)", "trigger", match.key)
 				c.treatments.SetESWT(*match.value.(*models.ESWT))
+			case "ESWT_MODE":
+				slog.Debug("Hotstring Triggered (ESWT_MODE)", "trigger", match.key, "baseKey", match.baseKey)
+				eswtVal := match.value.(*models.ESWT)
+				if len(matchedEswtBaseKeys) == 0 {
+					c.treatments.SetESWT(*eswtVal)
+				} else {
+					c.treatments.SetAddExtraTreatments(*eswtVal)
+				}
+				matchedEswtBaseKeys = append(matchedEswtBaseKeys, match.baseKey)
 			case "FirstMeeting":
 				firstMeeting := match.value.(*models.FirstMeeting)
 				slog.Debug("Hotstring Triggered (FirstMeeting)", "trigger", match.key, "sites", firstMeeting.GetSites())
@@ -918,6 +974,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
 	// Blocks 매치가 있을 때만 실행 (simple 입력만 있을 때 불필요한 caudal/isP 트리거 방지)
 	leftoverP := false
+	leftoverN := false
 	if hasBlocksMatch {
 		for i := 0; i < len(c.buffer); i++ {
 			if !processed[i] {
@@ -954,6 +1011,10 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				} else if c.buffer[i] == 'p' {
 					slog.Debug("Hotstring Triggered (Leftover 'p' -> isP=true)")
 					leftoverP = true
+					processed[i] = true
+				} else if c.buffer[i] == 'n' {
+					slog.Debug("Hotstring Triggered (Leftover 'n' -> isN=true)")
+					leftoverN = true
 					processed[i] = true
 				} else if c.buffer[i] == '7' {
 					slog.Debug("Hotstring Triggered (Leftover '7' -> hasSeven=true)")
@@ -1027,9 +1088,12 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	if leftoverP {
 		c.treatments.SetAllInjectionsIsP(true)
 	}
+	if leftoverN {
+		c.treatments.SetAllInjectionsIsN(true)
+	}
 
-	// 모드 프리픽스 문자(z/x/s)는 별도로 processed에 표시
-	if isFirstMeetingMode || isXrayMode || isSonoMode {
+	// 모드 프리픽스 문자(z/x/s/e)는 별도로 processed에 표시
+	if isFirstMeetingMode || isXrayMode || isSonoMode || isEswtMode {
 		processed[0] = true
 	}
 
@@ -1047,6 +1111,18 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					output.SetChartText(sonoVal.GetText())
 				}
 				output.AddOrderCode(sonoVal.GetCode())
+			}
+		}
+	}
+
+	// ESWT 모드에서 trailing 's'가 미처리 상태이면 → 매칭된 모든 ESWT 키에 대해 K_SonoStim도 추가
+	if isEswtMode && len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
+		lastPos := len(c.buffer) - 1
+		processed[lastPos] = true
+		for _, key := range matchedEswtBaseKeys {
+			if sntVal, exists := hotstrings.K_SonoStim[key]; exists {
+				slog.Debug("Hotstring Triggered (ESWT_MODE trailing-s SonoStim)", "key", key)
+				c.treatments.SetAddExtraTreatments(*sntVal)
 			}
 		}
 	}
@@ -1242,17 +1318,23 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// 매칭된 글자 수 + 트리거 키 1 = deleteCount
 	if !isClipboard {
 		deleteCount = len(processed)
+		slog.Info("[DELETE] processed map size", "processedLen", deleteCount, "buffer", c.buffer, "bufferLen", len(c.buffer))
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
-			// z/x/s prefix는 processed에 포함되지 않으므로 추가
+			// z/x/s/e prefix는 processed에 포함되어 있으므로 별도 추가 불필요
+			// (단, isFirstMeetingMode/isXrayMode/isSonoMode 는 processed[0]=true 처리됨)
 			if isFirstMeetingMode || isXrayMode || isSonoMode {
 				deleteCount += 1
 			}
 		}
+		slog.Info("[DELETE] deleteCount before cap", "deleteCount", deleteCount,
+			"isFirstMeetingMode", isFirstMeetingMode, "isXrayMode", isXrayMode,
+			"isSonoMode", isSonoMode, "isEswtMode", isEswtMode)
 		if deleteCount > 20 {
 			deleteCount = 20
 		}
 		output.SetDeleteHostring(deleteCount)
+		slog.Info("[DELETE] final deleteCount set", "deleteCount", deleteCount)
 	}
 
 	return output
