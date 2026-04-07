@@ -165,7 +165,7 @@ func (c *HotstringController) Start() {
 								mx999 := site
 								for _, v := range hotstrings.K_Blocks {
 									siteName := v.GetSite()
-									if siteName == site || strings.HasPrefix(site, siteName+" ") {
+									if strings.EqualFold(siteName, site) || strings.HasPrefix(strings.ToLower(site), strings.ToLower(siteName)+" ") {
 										code = v.GetCode()
 										mx999 = v.GetMx999()
 										break
