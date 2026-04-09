@@ -1237,7 +1237,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// etc 코드가 .+999_pf_0 이면 "pt) 도수프리\n    자기장\n" 를 f/u) 앞에 삽입
 	if hasCPrefix {
 		ct := output.GetChartText()
-		insert := "pt) 도수프리\n     자기장\n"
+		magneticArea := ""
+		if area, exists := hotstrings.K_Magnetics[lastBlockBaseKey]; exists {
+			magneticArea = " " + area
+		}
+		insert := "pt) 도수프리\n     자기장" + magneticArea + "\n"
 		if strings.Contains(ct, "f/u)") {
 			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
 		} else if ct != "" {
@@ -1251,7 +1255,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// etc 코드가 .+999_pm_0 이면 "pt) 자기장\n" 를 f/u) 앞에 삽입
 	if hasPPrefix {
 		ct := output.GetChartText()
-		insert := "pt) 자기장\n"
+		magneticArea := ""
+		if area, exists := hotstrings.K_Magnetics[lastBlockBaseKey]; exists {
+			magneticArea = " " + area
+		}
+		insert := "pt) 자기장" + magneticArea + "\n"
 		if strings.Contains(ct, "f/u)") {
 			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
 		} else if ct != "" {
