@@ -160,6 +160,21 @@ func (c *HotstringController) Start() {
 
 								site := line // 나머지는 site
 
+								// site prefix 정규화: "mbb/fjb/snrb/drgb C/L/T..." → "c/l/t + prefix..."
+								lowerSite := strings.ToLower(site)
+								for _, pfx := range []string{"mbb", "fjb", "snrb", "drgb"} {
+									if strings.HasPrefix(lowerSite, pfx+" c") {
+										site = "c" + site
+										break
+									} else if strings.HasPrefix(lowerSite, pfx+" l") {
+										site = "l" + site
+										break
+									} else if strings.HasPrefix(lowerSite, pfx+" t") {
+										site = "t" + site
+										break
+									}
+								}
+
 								// 매칭되는 코드를 K_Blocks에서 검색 (정확히 일치하거나, site가 "known_site " 로 시작하는 경우)
 								code := ""
 								mx999 := site
