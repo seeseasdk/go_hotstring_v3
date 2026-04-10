@@ -11,10 +11,11 @@ import (
 )
 
 type HotstringController struct {
-	cc         *ChannelController
-	buffer     string
-	treatments *models.Treatments
-	isMuting   bool // TypeStr 출력 중 버퍼 추가 차단
+	cc                 *ChannelController
+	buffer             string
+	treatments         *models.Treatments
+	isMuting           bool   // TypeStr 출력 중 버퍼 추가 차단
+	clipboardChartText string // Ctrl+* 트리거시 f/u) 날짜 갱신된 chartText 임시 저장
 }
 
 func NewHotstringController(cc *ChannelController) *HotstringController {
@@ -44,6 +45,17 @@ func (c *HotstringController) Start() {
 					// Trigger processing of the accumulated buffer
 					isCtrlEnter := !isClipboard
 					output := c.processBuffer(isClipboard, isCtrlEnter)
+
+					// Ctrl+* 트리거에서 미리 계산된 chartText가 있으면 output에 설정
+					if c.clipboardChartText != "" {
+						existing := output.GetChartText()
+						if existing != "" {
+							output.SetChartText(existing + "\n" + c.clipboardChartText)
+						} else {
+							output.SetChartText(c.clipboardChartText)
+						}
+						c.clipboardChartText = ""
+					}
 
 					// Then output
 					c.cc.OutputChan <- models.NewChannelStuff("HotstringController", "OutputController", "UpdateOutput", true, output)
@@ -107,6 +119,11 @@ func (c *HotstringController) Start() {
 								} else if lastIsPeri {
 									isPeri = true
 								}
+							}
+
+							// f/u) 라인은 주사가 아니고 specificText에도 포함하지 않으므로 skip
+							if strings.HasPrefix(line, "f/u)") {
+								continue
 							}
 
 							// e) 나 ef) 혹은 snt) 나 pe) 나 pt) 로 시작하는 건 주사가 아니므로 제외
@@ -215,6 +232,14 @@ func (c *HotstringController) Start() {
 						}
 
 						slog.Info("[CLIPBOARD] Parsed to Treatments", "text", text)
+					}
+					continue
+				}
+
+				// SetClipboardChartText: Ctrl+* 트리거에서 f/u) 날짜가 갱신된 chartText를 저장
+				if stuff.Do == "SetClipboardChartText" {
+					if txt, ok := stuff.Object.(string); ok {
+						c.clipboardChartText = txt
 					}
 					continue
 				}

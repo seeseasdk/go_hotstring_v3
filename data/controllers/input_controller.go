@@ -189,20 +189,32 @@ func (c *InputController) Start() {
 				continue
 			}
 
-			// Ctrl + * 액션 (선택영역 복사 후 specificText로 입력)
+			// Ctrl + * 액션 (선택영역 잘라내기 후 specificText/mx999 처리 + chartText 재입력)
 			// 텐키패드 별표(VK_MULTIPLY)=106, 메인키보드 별표(Shift+8)=56
 			if ctrlPressed && (ev.Rawcode == 106 || (shiftPressed && ev.Rawcode == 56)) {
-				slog.Info("[CTRL+*] Copying and pasting as treatment!")
+				slog.Info("[CTRL+*] Cutting and pasting as treatment!")
 
 				go func() {
-					// 1. Ctrl + C 입력해서 클립보드로 복사
-					robotgo.KeyTap("c", "ctrl")
+					// 1. Ctrl + X 입력해서 클립보드로 잘라내기
+					robotgo.KeyTap("x", "ctrl")
 					time.Sleep(100 * time.Millisecond) // 클립보드에 담길 시간 대기
 
 					// 2. 클립보드 텍스트 읽기
 					text, err := robotgo.ReadAll()
 					if err == nil && text != "" {
-						// 3. 바로 전송하지 않고 HotstringController의 트리트먼트에 복사 내용 추가 명령
+						// 3. chartText: f/u) 날짜를 오늘 요일 기준으로 재계산한 텍스트 미리 전송
+						chartText := buildClipboardChartText(text)
+						if chartText != "" {
+							c.cc.InputChan <- models.NewChannelStuff(
+								"InputController",
+								"HotstringController",
+								"SetClipboardChartText",
+								true,
+								chartText,
+							)
+						}
+
+						// 4. specificText/mx999 처리를 위해 주사 내용을 파싱
 						c.cc.InputChan <- models.NewChannelStuff(
 							"InputController",
 							"HotstringController",
@@ -211,7 +223,7 @@ func (c *InputController) Start() {
 							text,
 						)
 
-						// 4. 추가된 후 곧바로 출력을 원하므로 Flush명령도 전송
+						// 5. 추가된 후 곧바로 출력을 원하므로 Flush명령도 전송
 						time.Sleep(50 * time.Millisecond)
 						c.cc.InputChan <- models.NewChannelStuff(
 							"InputController",
@@ -328,4 +340,36 @@ func (c *InputController) Start() {
 			}
 		}
 	}
+}
+
+// buildClipboardChartText: 클립보드 텍스트에서 f/u) 날짜를 오늘 요일 기준으로 업데이트한 chartText 반환
+// 월/화/수 → +3일, 목/금/토 → +4일
+func buildClipboardChartText(text string) string {
+	now := time.Now()
+	var daysToAdd int
+	switch now.Weekday() {
+	case time.Monday, time.Tuesday, time.Wednesday:
+		daysToAdd = 3
+	default: // 목, 금, 토, 일
+		daysToAdd = 4
+	}
+	futureDate := now.AddDate(0, 0, daysToAdd).Format("2006-01-02")
+
+	dateRe := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}\s+`)
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	var result []string
+	for _, line := range lines {
+		stripped := dateRe.ReplaceAllString(line, "")
+		if strings.TrimSpace(stripped) == "" {
+			continue
+		}
+		trimmed := strings.TrimLeft(stripped, " \t")
+		if strings.HasPrefix(trimmed, "f/u) ") {
+			indent := stripped[:len(stripped)-len(trimmed)]
+			result = append(result, indent+"f/u) "+futureDate)
+		} else {
+			result = append(result, stripped)
+		}
+	}
+	return strings.TrimSpace(strings.Join(result, "\n"))
 }

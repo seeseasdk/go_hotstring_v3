@@ -502,7 +502,44 @@ func (i Treatments) GetTextForSpecific() string {
 	}
 
 	// 클립보드 매모(복사한 텍스트)를 specificText에 추가 반영
+	// f/u) 라인 제외, pt)는 m8/m13만 허용(나머지 pt) 블록 연속 줄도 제외)
+	knownSpecificPrefixes := []string{"c) ", "s) ", "p) ", "snt) ", "ef) ", "e) ", "pt) ", "pe) ", "f/u) ", "er) "}
+	inExcludeBlock := false
 	for _, memo := range i.clipboardMemos {
+		trimmed := strings.TrimLeft(memo, " \t")
+
+		// f/u) 라인은 항상 제외
+		if strings.HasPrefix(trimmed, "f/u)") {
+			inExcludeBlock = false
+			continue
+		}
+
+		// pt) 라인: m8, m13만 허용, 나머지는 exclude block 시작
+		if strings.HasPrefix(trimmed, "pt) ") || trimmed == "pt)" {
+			content := strings.TrimPrefix(trimmed, "pt) ")
+			if content == "m8" || content == "m13" ||
+				strings.HasPrefix(content, "m8 ") || strings.HasPrefix(content, "m13 ") {
+				inExcludeBlock = false
+			} else {
+				inExcludeBlock = true
+				continue
+			}
+		} else if inExcludeBlock {
+			// exclude block 중에 known prefix가 나오면 block 종료 후 정상 처리
+			hasKnown := false
+			for _, pfx := range knownSpecificPrefixes {
+				if strings.HasPrefix(trimmed, pfx) {
+					hasKnown = true
+					break
+				}
+			}
+			if hasKnown {
+				inExcludeBlock = false
+			} else {
+				continue // pt) 블록 연속 줄 제외
+			}
+		}
+
 		if text == "" {
 			text += formattedDate + " " + memo + "\n"
 		} else {

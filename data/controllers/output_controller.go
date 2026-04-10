@@ -111,6 +111,25 @@ func (c *OutputController) Start() {
 					}
 				}
 
+				if mx999Text := output.GetMx999Text(); mx999Text != "" {
+					if coord, exists := hotstrings.K_Coordinates["mx999Window"]; exists {
+						time.Sleep(50 * time.Millisecond) // 창 이동 전 딜레이 추가
+						robotgo.Move(coord.X, coord.Y)
+						robotgo.Click("left")
+						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
+
+						robotgo.KeyToggle("ctrl", "down")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyTap("end")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(50 * time.Millisecond)
+
+						robotgo.TypeStr(mx999Text)
+						time.Sleep(50 * time.Millisecond)
+					}
+				}
+
 				drugCode := output.GetDrugCode()
 				drugDays := output.GetDrug()
 				orderCodes := output.GetOrderCode()
@@ -161,25 +180,6 @@ func (c *OutputController) Start() {
 								time.Sleep(500 * time.Millisecond)
 							}
 						}
-						time.Sleep(50 * time.Millisecond)
-					}
-				}
-
-				if mx999Text := output.GetMx999Text(); mx999Text != "" {
-					if coord, exists := hotstrings.K_Coordinates["mx999Window"]; exists {
-						time.Sleep(50 * time.Millisecond) // 창 이동 전 딜레이 추가
-						robotgo.Move(coord.X, coord.Y)
-						robotgo.Click("left")
-						time.Sleep(50 * time.Millisecond) // 클릭 후 포커스 딜레이
-
-						robotgo.KeyToggle("ctrl", "down")
-						time.Sleep(10 * time.Millisecond)
-						robotgo.KeyTap("end")
-						time.Sleep(10 * time.Millisecond)
-						robotgo.KeyToggle("ctrl", "up")
-						time.Sleep(50 * time.Millisecond)
-
-						robotgo.TypeStr(mx999Text)
 						time.Sleep(50 * time.Millisecond)
 					}
 				}
