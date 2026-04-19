@@ -436,8 +436,9 @@ func (i Treatments) GetTextForSpecific() string {
 				extraEswts = append(extraEswts, e)
 			}
 		}
+		isEswtOnly := text == ""
 		var eswtPrefix string
-		if text == "" {
+		if isEswtOnly {
 			eswtPrefix = formattedDate + " "
 		} else {
 			eswtPrefix = "                "
@@ -445,6 +446,12 @@ func (i Treatments) GetTextForSpecific() string {
 		eswtBlankPrefix := strings.Repeat(" ", len(eswtPrefix))
 		contCont := strings.Repeat(" ", len(eswtPrefix)+22)   // focus 계속줄 들여쓰기 (+10)
 		radialCont := strings.Repeat(" ", len(eswtPrefix)+22) // radial 계속줄 들여쓰기 (+9)
+		var radialLeadSpaces string
+		if isEswtOnly {
+			radialLeadSpaces = "         " // 4+5 공백 (e-prefix)
+		} else {
+			radialLeadSpaces = "    " // 4 공백
+		}
 
 		switch i.eSWT.GetFeeType() {
 		case constants.K_NORMAL:
@@ -452,7 +459,7 @@ func (i Treatments) GetTextForSpecific() string {
 			for _, e := range extraEswts {
 				text += contCont + e.GetDirection() + " " + e.GetFocus() + "\n"
 			}
-			text += eswtBlankPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtBlankPrefix + radialLeadSpaces + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 			for _, e := range extraEswts {
 				text += radialCont + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
@@ -461,7 +468,7 @@ func (i Treatments) GetTextForSpecific() string {
 			for _, e := range extraEswts {
 				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetFocus() + "\n"
 			}
-			text += eswtBlankPrefix + "    radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
+			text += eswtBlankPrefix + radialLeadSpaces + "radial on " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 			for _, e := range extraEswts {
 				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
