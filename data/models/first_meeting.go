@@ -208,19 +208,23 @@ func (fm FirstMeeting) GetChartText() string {
 	dayMonYear := "d"
 
 	if fm.duration != "" {
-		if strings.Contains(fm.duration, "d") {
-			dayMonYear = ""
+		if fm.duration == "0" {
+			dur = "당일"
+		} else {
+			if strings.Contains(fm.duration, "d") {
+				dayMonYear = ""
+			}
+			if strings.Contains(fm.duration, "m") {
+				dayMonYear = ""
+			}
+			if strings.Contains(fm.duration, "w") {
+				dayMonYear = ""
+			}
+			if strings.Contains(fm.duration, "y") {
+				dayMonYear = ""
+			}
+			dur = "for " + fm.duration + dayMonYear
 		}
-		if strings.Contains(fm.duration, "m") {
-			dayMonYear = ""
-		}
-		if strings.Contains(fm.duration, "w") {
-			dayMonYear = ""
-		}
-		if strings.Contains(fm.duration, "y") {
-			dayMonYear = ""
-		}
-		dur = "for " + fm.duration + dayMonYear
 	}
 
 	for i, site := range fm.sites {

@@ -664,6 +664,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var etcOrderCodes []string
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
+	var specificSonoStimInj *models.Injection // interscapular 등 specific sonostim을 가진 injection (cm5/cf5 등)
 	var matchedXrayBaseKeys []string
 	var matchedEswtBaseKeys []string
 
@@ -782,19 +783,36 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					} else if strings.HasPrefix(remainder, "s") {
 						if sntVal, exists := hotstrings.K_SonoStim[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (SonoStim Suffix)", "trigger", match.key+"s", "baseKey", match.baseKey)
-							c.treatments.SetAddExtraTreatments(*sntVal)
+							// interscapular 등 specific sonostim이 있으면 generic(TPZ/lower back) 대신 사용
+							if specificSonoStimInj != nil && (sntVal.GetSite() == "TPZ" || sntVal.GetSite() == "lower back") {
+								sntCode := constants.K_SINGLE_SNT
+								if specificSonoStimInj.GetDirection() == constants.K_BOTH {
+									if specificSonoStimInj.GetEswtFocus() != "TPZ" && specificSonoStimInj.GetEswtFocus() != "lower back" {
+										sntCode = constants.K_BOTH_SNT
+									}
+								}
+								overrideSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specificSonoStimInj.GetSonoStim(), sntCode)
+								c.treatments.SetAddExtraTreatments(*overrideSnt)
+							} else {
+								c.treatments.SetAddExtraTreatments(*sntVal)
+							}
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetSonoStim() != "" {
+							useInj := inj
+							// interscapular 등 specific sonostim이 있으면 generic(TPZ/lower back) 대신 사용
+							if specificSonoStimInj != nil && (inj.GetSonoStim() == "TPZ" || inj.GetSonoStim() == "lower back") {
+								useInj = specificSonoStimInj
+							}
 							sntCode := constants.K_SINGLE_SNT
-							if inj.GetDirection() == "Both" {
-								eswtFocus := inj.GetEswtFocus()
+							if useInj.GetDirection() == constants.K_BOTH {
+								eswtFocus := useInj.GetEswtFocus()
 								if eswtFocus != "TPZ" && eswtFocus != "lower back" {
 									sntCode = constants.K_BOTH_SNT
 								}
 							}
-							snt := models.NewSonoStim(inj.GetDirection(), inj.GetSonoStim(), sntCode)
+							snt := models.NewSonoStim(useInj.GetDirection(), useInj.GetSonoStim(), sntCode)
 							c.treatments.SetAddExtraTreatments(*snt)
 							processed[remainderPos] = true
 							remainderPos += 1
@@ -964,6 +982,10 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				hasBlocksMatch = true
 				lastBlockBaseKey = match.baseKey
 				lastBlockInjection = injection
+				// interscapular sonostim (cm5/cf5 계열) 기록
+				if injection.GetSonoStim() == "interscapular" {
+					specificSonoStimInj = injection
+				}
 			case "Simples":
 				slog.Debug("Hotstring Triggered (Simples)", "trigger", match.key)
 				simple, ok := match.value.(*models.SimpleInput)
@@ -1115,17 +1137,27 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					}
 				} else if c.buffer[i] == 's' {
 					if lastBlockInjection != nil {
+						// interscapular 등 specific sonostim 우선 적용
+						useInj := lastBlockInjection
+						if specificSonoStimInj != nil && (lastBlockInjection.GetSonoStim() == "TPZ" || lastBlockInjection.GetSonoStim() == "lower back") {
+							useInj = specificSonoStimInj
+						}
 						sntCode := constants.K_SINGLE_SNT
-						if lastBlockInjection.GetDirection() == "Both" {
-							eswtFocus := lastBlockInjection.GetEswtFocus()
+						if useInj.GetDirection() == constants.K_BOTH {
+							eswtFocus := useInj.GetEswtFocus()
 							if eswtFocus != "TPZ" && eswtFocus != "lower back" {
 								sntCode = constants.K_BOTH_SNT
 							}
 						}
 						if sntVal, exists := hotstrings.K_SonoStim[lastBlockBaseKey]; exists {
-							c.treatments.SetAddExtraTreatments(*sntVal)
+							if specificSonoStimInj != nil && (sntVal.GetSite() == "TPZ" || sntVal.GetSite() == "lower back") {
+								newSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specificSonoStimInj.GetSonoStim(), sntCode)
+								c.treatments.SetAddExtraTreatments(*newSnt)
+							} else {
+								c.treatments.SetAddExtraTreatments(*sntVal)
+							}
 						} else if lastBlockInjection.GetSonoStim() != "" {
-							snt := models.NewSonoStim(lastBlockInjection.GetDirection(), lastBlockInjection.GetSonoStim(), sntCode)
+							snt := models.NewSonoStim(useInj.GetDirection(), useInj.GetSonoStim(), sntCode)
 							c.treatments.SetAddExtraTreatments(*snt)
 						}
 					}
