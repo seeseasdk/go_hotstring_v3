@@ -273,8 +273,20 @@ func (c *InputController) Start() {
 				continue
 			}
 
-			// Space (VK_SPACE=32), 방향키/PgUp/PgDn (33~34, 37~40), Delete(46) - buffer 초기화
-			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 40) || ev.Rawcode == 46 {
+			// 화살표 키 (VK_LEFT=37, VK_UP=38, VK_RIGHT=39, VK_DOWN=40) - buffer 초기화
+			if ev.Rawcode == 37 || ev.Rawcode == 38 || ev.Rawcode == 39 || ev.Rawcode == 40 {
+				c.cc.InputChan <- models.NewChannelStuff(
+					"InputController",
+					"HotstringController",
+					"ClearBuffer",
+					false,
+					nil,
+				)
+				continue
+			}
+
+			// Space (VK_SPACE=32), PgUp/PgDn (33~34), Delete(46) - buffer 초기화
+			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 34) || ev.Rawcode == 46 {
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
