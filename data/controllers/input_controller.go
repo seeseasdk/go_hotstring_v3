@@ -251,6 +251,7 @@ func (c *InputController) Start() {
 			}
 			// 일반 Enter (VK_RETURN=13) - buffer 초기화
 			if !ctrlPressed && ev.Rawcode == 13 {
+				slog.Info("[KEY] Enter 입력 감지 (실제 입력되지 않음)", "rawcode", ev.Rawcode, "shift", shiftPressed, "isMuting", c.cc.IsMuting.Load())
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -263,6 +264,11 @@ func (c *InputController) Start() {
 
 			// Home (VK_HOME=36), End (VK_END=35), Shift+Home, Shift+End - buffer 초기화
 			if ev.Rawcode == 35 || ev.Rawcode == 36 {
+				keyName := "End"
+				if ev.Rawcode == 36 {
+					keyName = "Home"
+				}
+				slog.Info("[KEY] "+keyName+" 입력 감지 (실제 입력되지 않음)", "key", keyName, "rawcode", ev.Rawcode, "ctrl", ctrlPressed, "shift", shiftPressed, "isMuting", c.cc.IsMuting.Load())
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -275,6 +281,9 @@ func (c *InputController) Start() {
 
 			// 화살표 키 (VK_LEFT=37, VK_UP=38, VK_RIGHT=39, VK_DOWN=40) - buffer 초기화
 			if ev.Rawcode == 37 || ev.Rawcode == 38 || ev.Rawcode == 39 || ev.Rawcode == 40 {
+				arrowNames := map[uint16]string{37: "Left", 38: "Up", 39: "Right", 40: "Down"}
+				arrowKey := arrowNames[ev.Rawcode]
+				slog.Info("[KEY] 화살표("+arrowKey+") 입력 감지 (실제 입력되지 않음)", "key", arrowKey, "rawcode", ev.Rawcode, "ctrl", ctrlPressed, "shift", shiftPressed, "isMuting", c.cc.IsMuting.Load())
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -287,6 +296,9 @@ func (c *InputController) Start() {
 
 			// Space (VK_SPACE=32), PgUp/PgDn (33~34), Delete(46) - buffer 초기화
 			if ev.Rawcode == 32 || (ev.Rawcode >= 33 && ev.Rawcode <= 34) || ev.Rawcode == 46 {
+				specialNames := map[uint16]string{32: "Space", 33: "PgUp", 34: "PgDn", 46: "Delete"}
+				specialKey := specialNames[ev.Rawcode]
+				slog.Info("[KEY] "+specialKey+" 입력 감지 (실제 입력되지 않음)", "key", specialKey, "rawcode", ev.Rawcode, "ctrl", ctrlPressed, "shift", shiftPressed, "isMuting", c.cc.IsMuting.Load())
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
@@ -298,6 +310,7 @@ func (c *InputController) Start() {
 			}
 			// 백스페이스 (VK_BACK=8, 삭제키 VK_DELETE=46)
 			if ev.Rawcode == 8 {
+				slog.Info("[KEY] Backspace 입력 감지 (실제 입력되지 않음)", "rawcode", ev.Rawcode, "ctrl", ctrlPressed, "isMuting", c.cc.IsMuting.Load())
 				c.cc.InputChan <- models.NewChannelStuff(
 					"InputController",
 					"HotstringController",
