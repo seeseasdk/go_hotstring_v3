@@ -454,6 +454,10 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 	} else if isXrayMode {
 		for k, v := range hotstrings.K_Xrays {
+			// xray 모드에서는 's'로 끝나는 키는 매칭하지 않음 (trailing 's'로 일괄 처리)
+			if strings.HasSuffix(k, "s") {
+				continue
+			}
 			idx := 1 // 'x' 이후부터 검색
 			for {
 				if idx >= len(c.buffer) {
@@ -666,7 +670,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var lastBlockInjection *models.Injection
 	var specificSonoStimInj *models.Injection // interscapular 등 specific sonostim을 가진 injection (cm5/cf5 등)
 	var matchedXrayBaseKeys []string
+	var matchedXrayValues []*models.Xray
 	var matchedEswtBaseKeys []string
+	var matchedFirstMeetingBaseKeys []string
 
 	// 다음 매치의 시작 위치 집합: suffix 루프에서 다음 매치를 잘못 소비하지 않도록
 	matchStartPositions := make(map[int]bool)
@@ -886,18 +892,25 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				} else {
 					combinedFirstMeeting.Merge(firstMeeting)
 				}
+				matchedFirstMeetingBaseKeys = append(matchedFirstMeetingBaseKeys, match.baseKey)
 			case "Xrays":
 				slog.Debug("Hotstring Triggered (Xrays)", "trigger", match.key)
 				xray, ok := match.value.(*models.Xray)
 				if ok {
-					curChart := output.GetChartText()
-					if curChart != "" {
-						output.SetChartText(curChart + "\n" + xray.GetText())
+					if isXrayMode {
+						// xray 모드에서는 trailing 's' 확인 후 출력하므로 수집만
+						matchedXrayBaseKeys = append(matchedXrayBaseKeys, match.baseKey)
+						matchedXrayValues = append(matchedXrayValues, xray)
 					} else {
-						output.SetChartText(xray.GetText())
+						curChart := output.GetChartText()
+						if curChart != "" {
+							output.SetChartText(curChart + "\n" + xray.GetText())
+						} else {
+							output.SetChartText(xray.GetText())
+						}
+						output.AddOrderCode(xray.GetCode())
+						matchedXrayBaseKeys = append(matchedXrayBaseKeys, match.baseKey)
 					}
-					output.AddOrderCode(xray.GetCode())
-					matchedXrayBaseKeys = append(matchedXrayBaseKeys, match.baseKey)
 				}
 			case "Sonos":
 				slog.Debug("Hotstring Triggered (Sonos)", "trigger", match.key)
@@ -1179,20 +1192,33 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		processed[0] = true
 	}
 
-	// xray 모드에서 trailing 's'가 미처리 상태이면 → 매칭된 모든 xray 키에 대해 K_Sonos도 추가
-	if isXrayMode && len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
-		lastPos := len(c.buffer) - 1
-		processed[lastPos] = true
-		for _, key := range matchedXrayBaseKeys {
-			if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
-				slog.Debug("Hotstring Triggered (Xray trailing-s Sono)", "key", key)
+	// xray 모드: 수집된 xray를 출력 (trailing 's'가 있으면 key+"s" 버전, 없으면 원본)
+	if isXrayMode {
+		hasTrailingS := len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1]
+		if hasTrailingS {
+			processed[len(c.buffer)-1] = true
+		}
+		for i, key := range matchedXrayBaseKeys {
+			var xrayToAdd *models.Xray
+			if hasTrailingS {
+				sKey := key + "s"
+				if xrayVal, exists := hotstrings.K_Xrays[sKey]; exists {
+					slog.Debug("Hotstring Triggered (Xray trailing-s Xray variant)", "key", sKey)
+					xrayToAdd = xrayVal
+				} else {
+					xrayToAdd = matchedXrayValues[i]
+				}
+			} else {
+				xrayToAdd = matchedXrayValues[i]
+			}
+			if xrayToAdd != nil {
 				curChart := output.GetChartText()
 				if curChart != "" {
-					output.SetChartText(curChart + "\n" + sonoVal.GetText())
+					output.SetChartText(curChart + "\n" + xrayToAdd.GetText())
 				} else {
-					output.SetChartText(sonoVal.GetText())
+					output.SetChartText(xrayToAdd.GetText())
 				}
-				output.AddOrderCode(sonoVal.GetCode())
+				output.AddOrderCode(xrayToAdd.GetCode())
 			}
 		}
 	}
@@ -1207,6 +1233,36 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				c.treatments.SetAddExtraTreatments(*sntVal)
 			}
 		}
+	}
+
+	// FirstMeeting 모드(z prefix)에서 trailing 's'가 미처리 상태이면 → combinedFirstMeeting의 xray 리스트를 's' 버전으로 교체
+	if isFirstMeetingMode && combinedFirstMeeting != nil && len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
+		processed[len(c.buffer)-1] = true
+		// K_Xrays를 (text,code) → non-s key 역방향 맵으로 구성
+		type xrayValKey struct{ text, code string }
+		xrayValueToKey := make(map[xrayValKey]string)
+		for k, v := range hotstrings.K_Xrays {
+			if !strings.HasSuffix(k, "s") {
+				xrayValueToKey[xrayValKey{v.GetText(), v.GetCode()}] = k
+			}
+		}
+		xrays := combinedFirstMeeting.GetXray()
+		newXrays := make([]models.Xray, 0, len(xrays))
+		for _, xr := range xrays {
+			xKey := xrayValKey{xr.GetText(), xr.GetCode()}
+			if k, ok := xrayValueToKey[xKey]; ok {
+				sKey := k + "s"
+				if sXray, exists := hotstrings.K_Xrays[sKey]; exists {
+					slog.Debug("Hotstring Triggered (FirstMeeting trailing-s Xray replace)", "key", sKey)
+					newXrays = append(newXrays, *sXray)
+				} else {
+					newXrays = append(newXrays, xr)
+				}
+			} else {
+				newXrays = append(newXrays, xr)
+			}
+		}
+		combinedFirstMeeting.SetXray(newXrays)
 	}
 
 	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmyw]? 패턴을 duration으로 처리하여 processed에 표시
