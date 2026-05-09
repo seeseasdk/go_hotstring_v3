@@ -922,11 +922,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				slog.Debug("Hotstring Triggered (Sonos)", "trigger", match.key)
 				sono, ok := match.value.(*models.Sono)
 				if ok {
-					curChart := output.GetChartText()
-					if curChart != "" {
-						output.SetChartText(curChart + "\n" + sono.GetText())
+					curSimple := output.GetSimpleText()
+					if curSimple != "" {
+						output.SetSimpleText(curSimple + "\n" + sono.GetText())
 					} else {
-						output.SetChartText(sono.GetText())
+						output.SetSimpleText(sono.GetText())
 					}
 					output.AddOrderCode(sono.GetCode())
 				}
@@ -1218,13 +1218,30 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				xrayToAdd = matchedXrayValues[i]
 			}
 			if xrayToAdd != nil {
-				curChart := output.GetChartText()
-				if curChart != "" {
-					output.SetChartText(curChart + "\n" + xrayToAdd.GetText())
+				curSimple := output.GetSimpleText()
+				if curSimple != "" {
+					output.SetSimpleText(curSimple + "\n" + xrayToAdd.GetText())
 				} else {
-					output.SetChartText(xrayToAdd.GetText())
+					output.SetSimpleText(xrayToAdd.GetText())
 				}
 				output.AddOrderCode(xrayToAdd.GetCode())
+			}
+		}
+		// trailing 's' 처리 후에도 맨 끝에 미처리 's'가 하나 더 남아 있으면 → K_Sonos에서 sono 추가
+		// 예: xshrss → xray shrs + sono shr
+		if len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
+			processed[len(c.buffer)-1] = true
+			for _, key := range matchedXrayBaseKeys {
+				if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
+					slog.Debug("Hotstring Triggered (Xray extra-s Sono)", "key", key)
+					curSimple := output.GetSimpleText()
+					if curSimple != "" {
+						output.SetSimpleText(curSimple + "\n" + sonoVal.GetText())
+					} else {
+						output.SetSimpleText(sonoVal.GetText())
+					}
+					output.AddOrderCode(sonoVal.GetCode())
+				}
 			}
 		}
 	}
