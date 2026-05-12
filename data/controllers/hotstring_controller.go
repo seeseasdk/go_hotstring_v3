@@ -1198,12 +1198,32 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		processed[0] = true
 	}
 
-	// xray 모드: 수집된 xray를 출력 (trailing 's'가 있으면 key+"s" 버전, 없으면 원본)
+	// xray 모드: 수집된 xray를 출력
+	// trailing 's' 개수에 따라:
+	//   1개: key+"s" 버전 xray (예: xshrs → shrs)
+	//   2개: key+"s" 버전 xray + sono (예: xshrss → shrs + sono shr)
 	if isXrayMode {
-		hasTrailingS := len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1]
-		if hasTrailingS {
-			processed[len(c.buffer)-1] = true
+		// 끝에서부터 미처리 's'가 연속으로 몇 개인지 센다
+		trailingSCount := 0
+		for i := len(c.buffer) - 1; i >= 1; i-- {
+			if c.buffer[i] == 's' && !processed[i] {
+				trailingSCount++
+			} else {
+				break
+			}
 		}
+		hasTrailingS := trailingSCount >= 1
+		hasSonoS := trailingSCount >= 2
+
+		// 미처리 trailing 's' 모두 소비
+		consumed := 0
+		for i := len(c.buffer) - 1; i >= 1 && consumed < trailingSCount; i-- {
+			if c.buffer[i] == 's' && !processed[i] {
+				processed[i] = true
+				consumed++
+			}
+		}
+
 		for i, key := range matchedXrayBaseKeys {
 			var xrayToAdd *models.Xray
 			if hasTrailingS {
@@ -1227,10 +1247,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				output.AddOrderCode(xrayToAdd.GetCode())
 			}
 		}
-		// trailing 's' 처리 후에도 맨 끝에 미처리 's'가 하나 더 남아 있으면 → K_Sonos에서 sono 추가
-		// 예: xshrss → xray shrs + sono shr
-		if len(c.buffer) > 1 && c.buffer[len(c.buffer)-1] == 's' && !processed[len(c.buffer)-1] {
-			processed[len(c.buffer)-1] = true
+
+		// 's' 2개: sono 추가 (예: xshrss → shrs xray + shr sono)
+		if hasSonoS {
 			for _, key := range matchedXrayBaseKeys {
 				if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
 					slog.Debug("Hotstring Triggered (Xray extra-s Sono)", "key", key)

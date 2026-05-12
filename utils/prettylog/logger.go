@@ -3,6 +3,7 @@ package prettylog
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -28,7 +29,16 @@ func InitLogger() *slog.Logger {
 }
 
 func getLogFilePath() string {
-	logFileName := time.Now().Format("./log/2006-01-02") + ".log"
+	// 실행 파일 기준이 아닌 고정 경로 사용
+	exePath, err := os.Executable()
+	logDir := "./log"
+	if err == nil {
+		// exe와 같은 폴더의 log/ 디렉터리
+		dir := exePath[:len(exePath)-len(filepath.Base(exePath))]
+		logDir = dir + "log"
+	}
+	os.MkdirAll(logDir, 0755)
+	logFileName := logDir + "/" + time.Now().Format("2006-01-02") + ".log"
 
 	if _, err := os.Stat(logFileName); err != nil {
 		if _, err := os.Create(logFileName); err != nil {

@@ -26,10 +26,12 @@ func (c *OutputController) Start() {
 	slog.Info("OutputController started")
 
 	go func() {
+		outputCount := 0
 		for stuff := range c.cc.OutputChan {
 			// Check if we received an OutputStuff update
 			if output, ok := stuff.Object.(*models.OutputStuff); ok {
-				slog.Info("OutputController: Output Updated")
+				outputCount++
+				slog.Warn("OutputController: Output Received", "outputCount", outputCount)
 
 				// 중복 등 에러가 있으면 키보드 입력 없이 에러 로그만 남기고 스킵
 				if errMsg := output.GetErrorMsg(); errMsg != "" {
@@ -130,6 +132,30 @@ func (c *OutputController) Start() {
 					}
 				}
 
+				if simpleText := output.GetSimpleText(); simpleText != "" {
+					// 윈도우 클릭 없이 바로 입력
+					robotgo.TypeStr(simpleText)
+					time.Sleep(50 * time.Millisecond)
+
+					// ExtraDo가 same_input_memo_window이면 memoWindow에도 동일 입력 후 chartWindow로 복귀
+					if output.GetExtraDo() == constants.K_SAME_INPUT_MEMO_WINDOW {
+						if coord, exists := hotstrings.K_Coordinates["memoWindow"]; exists {
+							time.Sleep(50 * time.Millisecond)
+							robotgo.Move(coord.X, coord.Y)
+							robotgo.Click("left")
+							time.Sleep(50 * time.Millisecond)
+							robotgo.TypeStr(simpleText)
+							time.Sleep(50 * time.Millisecond)
+						}
+						if coord, exists := hotstrings.K_Coordinates["chartWindow"]; exists {
+							time.Sleep(50 * time.Millisecond)
+							robotgo.Move(coord.X, coord.Y)
+							robotgo.Click("left")
+							time.Sleep(50 * time.Millisecond)
+						}
+					}
+				}
+
 				drugCode := output.GetDrugCode()
 				drugDays := output.GetDrug()
 				orderCodes := output.GetOrderCode()
@@ -163,6 +189,9 @@ func (c *OutputController) Start() {
 
 						// 나머지 일반 주문 코드
 						for _, code := range orderCodes {
+							if code == "" {
+								continue // 빈 코드 스킵
+							}
 							if strings.Contains(code, "#") {
 								parts := strings.Split(code, "#")
 								robotgo.TypeStr(parts[0])
@@ -200,30 +229,6 @@ func (c *OutputController) Start() {
 
 						robotgo.TypeStr(memoText)
 						time.Sleep(50 * time.Millisecond)
-					}
-				}
-
-				if simpleText := output.GetSimpleText(); simpleText != "" {
-					// 윈도우 클릭 없이 바로 입력
-					robotgo.TypeStr(simpleText)
-					time.Sleep(50 * time.Millisecond)
-
-					// ExtraDo가 same_input_memo_window이면 memoWindow에도 동일 입력 후 chartWindow로 복귀
-					if output.GetExtraDo() == constants.K_SAME_INPUT_MEMO_WINDOW {
-						if coord, exists := hotstrings.K_Coordinates["memoWindow"]; exists {
-							time.Sleep(50 * time.Millisecond)
-							robotgo.Move(coord.X, coord.Y)
-							robotgo.Click("left")
-							time.Sleep(50 * time.Millisecond)
-							robotgo.TypeStr(simpleText)
-							time.Sleep(50 * time.Millisecond)
-						}
-						if coord, exists := hotstrings.K_Coordinates["chartWindow"]; exists {
-							time.Sleep(50 * time.Millisecond)
-							robotgo.Move(coord.X, coord.Y)
-							robotgo.Click("left")
-							time.Sleep(50 * time.Millisecond)
-						}
 					}
 				}
 
