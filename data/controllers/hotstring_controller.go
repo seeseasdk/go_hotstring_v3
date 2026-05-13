@@ -1215,6 +1215,25 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		hasTrailingS := trailingSCount >= 1
 		hasSonoS := trailingSCount >= 2
 
+		// 'ms' 패턴 감지: 버퍼 끝이 미처리 's'이고 그 앞이 미처리 'm'이면
+		// 코드에 s를 추가하지 않고 sono만 추가 (예: xshrms → shr xray + shr sono)
+		hasMSono := false
+		if trailingSCount == 1 {
+			sPos := len(c.buffer) - 1
+			for i := len(c.buffer) - 1; i >= 1; i-- {
+				if c.buffer[i] == 's' && !processed[i] {
+					sPos = i
+					break
+				}
+			}
+			if sPos >= 2 && c.buffer[sPos-1] == 'm' && !processed[sPos-1] {
+				hasMSono = true
+				processed[sPos-1] = true // 'm' 소비
+				hasTrailingS = false     // 's'를 xray 코드 변환에 쓰지 않음
+				hasSonoS = false
+			}
+		}
+
 		// 미처리 trailing 's' 모두 소비
 		consumed := 0
 		for i := len(c.buffer) - 1; i >= 1 && consumed < trailingSCount; i-- {
@@ -1253,6 +1272,22 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			for _, key := range matchedXrayBaseKeys {
 				if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
 					slog.Debug("Hotstring Triggered (Xray extra-s Sono)", "key", key)
+					curSimple := output.GetSimpleText()
+					if curSimple != "" {
+						output.SetSimpleText(curSimple + "\n" + sonoVal.GetText())
+					} else {
+						output.SetSimpleText(sonoVal.GetText())
+					}
+					output.AddOrderCode(sonoVal.GetCode())
+				}
+			}
+		}
+
+		// 'ms' 패턴: 코드에 s 없이 sono만 추가 (예: xshrms → shr xray + shr sono)
+		if hasMSono {
+			for _, key := range matchedXrayBaseKeys {
+				if sonoVal, exists := hotstrings.K_Sonos[key]; exists {
+					slog.Debug("Hotstring Triggered (Xray ms-Sono)", "key", key)
 					curSimple := output.GetSimpleText()
 					if curSimple != "" {
 						output.SetSimpleText(curSimple + "\n" + sonoVal.GetText())
