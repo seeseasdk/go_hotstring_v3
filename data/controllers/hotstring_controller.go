@@ -1554,9 +1554,8 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		slog.Info("[DELETE] processed map size", "processedLen", deleteCount, "buffer", c.buffer, "bufferLen", len(c.buffer))
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
-			// z/x/s/e prefix는 processed에 포함되어 있으므로 별도 추가 불필요
-			// (단, isFirstMeetingMode/isSonoMode 는 processed[0]=true 처리됨)
-			if isFirstMeetingMode || isSonoMode {
+			// z/x/s/e prefix는 processed[0]=true로 포함되어 있으므로 별도 추가 불필요
+			if isFirstMeetingMode {
 				deleteCount += 1
 			}
 		}
