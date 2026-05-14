@@ -1555,8 +1555,8 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
 			// z/x/s/e prefix는 processed에 포함되어 있으므로 별도 추가 불필요
-			// (단, isFirstMeetingMode/isXrayMode/isSonoMode 는 processed[0]=true 처리됨)
-			if isFirstMeetingMode || isXrayMode || isSonoMode {
+			// (단, isFirstMeetingMode/isSonoMode 는 processed[0]=true 처리됨)
+			if isFirstMeetingMode || isSonoMode {
 				deleteCount += 1
 			}
 		}
