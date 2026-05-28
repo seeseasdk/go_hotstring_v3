@@ -208,9 +208,18 @@ func (fm FirstMeeting) GetChartText() string {
 	dayMonYear := "d"
 
 	if fm.duration != "" {
-		if fm.duration == "0" {
+		switch fm.duration {
+		case "0":
 			dur = "당일"
-		} else {
+		case "o":
+			dur = "for 오래됨"
+		case "m":
+			dur = "for 몇달"
+		case "y":
+			dur = "for 몇년"
+		case "d":
+			dur = "for 며칠"
+		default:
 			if strings.Contains(fm.duration, "d") {
 				dayMonYear = ""
 			}

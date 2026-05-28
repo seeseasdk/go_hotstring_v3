@@ -589,7 +589,7 @@ func (i Treatments) GetTextForMx999() string {
 		case constants.K_SCB, constants.K_SC:
 			if inject.site == "caudal" {
 				if inject.direction != "" {
-					text += inject.direction + "좌골신경차단술" + "\n"
+					text += inject.direction + " 좌골신경차단술" + "\n"
 				} else {
 					text += "좌골신경차단술" + "\n"
 				}

@@ -1088,14 +1088,19 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						slog.Debug("Hotstring Triggered (Leading 'c' consumed, not caudal)")
 						processed[i] = true
 					} else if caudalVal, exists := hotstrings.K_Blocks["caudal"]; exists {
-						caudalKey := caudalVal.GetDirection() + "|" + caudalVal.GetSite()
+						caudalInj := *caudalVal
+						if lastBlockInjection != nil &&
+							(lastBlockInjection.GetDirection() == constants.K_RT || lastBlockInjection.GetDirection() == constants.K_LT) {
+							caudalInj.SetDirection(lastBlockInjection.GetDirection())
+						}
+						caudalKey := caudalInj.GetDirection() + "|" + caudalInj.GetSite()
 						if addedInjectionKeys[caudalKey] {
 							slog.Error("[DUPLICATE] caudal already added", "buffer", c.buffer)
 							output.SetErrorMsg("중복된 항목: caudal")
 						} else {
-							slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalVal.GetSite())
+							slog.Debug("Hotstring Triggered (Leftover 'c' -> caudal)", "trigger", "caudal", "site", caudalInj.GetSite(), "direction", caudalInj.GetDirection())
 							addedInjectionKeys[caudalKey] = true
-							c.treatments.SetAddInjection(*caudalVal)
+							c.treatments.SetAddInjection(caudalInj)
 						}
 						processed[i] = true
 					}
@@ -1354,7 +1359,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 
 	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmyw]? 패턴을 duration으로 처리하여 processed에 표시
 	if isFirstMeetingMode {
-		durationRe := regexp.MustCompile(`f(\d+[dmyw]?)`)
+		durationRe := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
 		if durLoc := durationRe.FindStringIndex(c.buffer); durLoc != nil {
 			for pos := durLoc[0]; pos < durLoc[1]; pos++ {
 				processed[pos] = true
@@ -1378,7 +1383,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	if isFirstMeetingMode && combinedFirstMeeting != nil {
-		re := regexp.MustCompile(`f(\d+[dmyw]?)`)
+		re := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
 		durationMatches := re.FindStringSubmatch(c.buffer)
 		if len(durationMatches) > 1 {
 			combinedFirstMeeting.SetDuration(durationMatches[1])
