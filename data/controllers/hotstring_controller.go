@@ -96,6 +96,7 @@ func (c *HotstringController) Start() {
 						lastIsWithCarm := false
 						lastIsPeri := false
 						lastWasErFocus := false
+						lastDirection := ""
 						for _, line := range lines {
 							line = strings.TrimSpace(line)
 							if line == "" {
@@ -182,6 +183,17 @@ func (c *HotstringController) Start() {
 								line = strings.TrimSpace(line)
 
 								site := line // 나머지는 site
+
+								// caudal 라인은 방향이 없으므로 lastDirection(Rt./Lt.)을 상속
+								if site == "caudal" && direction == "" &&
+									(lastDirection == constants.K_RT || lastDirection == constants.K_LT) {
+									direction = lastDirection
+								}
+
+								// direction이 새로 추출된 경우 lastDirection 갱신
+								if direction != "" {
+									lastDirection = direction
+								}
 
 								// site prefix 정규화: "mbb/fjb/snrb/drgb C/L/T..." → "c/l/t + prefix..."
 								lowerSite := strings.ToLower(site)
