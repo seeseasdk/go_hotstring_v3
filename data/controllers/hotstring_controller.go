@@ -1377,6 +1377,13 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				processed[pos] = true
 			}
 		}
+		// 날짜 패턴 (예: 5/5, 12/12) 처리
+		dateRe := regexp.MustCompile(`\d{1,2}/\d{1,2}`)
+		if dateLoc := dateRe.FindStringIndex(c.buffer); dateLoc != nil {
+			for pos := dateLoc[0]; pos < dateLoc[1]; pos++ {
+				processed[pos] = true
+			}
+		}
 	}
 
 	// 매칭되지 않은 문자가 있으면 트리거 전체 취소 (100% 매칭이 되어야 출력)
@@ -1399,6 +1406,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		durationMatches := re.FindStringSubmatch(c.buffer)
 		if len(durationMatches) > 1 {
 			combinedFirstMeeting.SetDuration(durationMatches[1])
+		}
+		dateRe2 := regexp.MustCompile(`(\d{1,2}/\d{1,2})`)
+		dateMatches := dateRe2.FindStringSubmatch(c.buffer)
+		if len(dateMatches) > 1 {
+			combinedFirstMeeting.SetDate(dateMatches[1])
 		}
 	}
 

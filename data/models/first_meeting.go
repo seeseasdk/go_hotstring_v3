@@ -7,6 +7,7 @@ import (
 type FirstMeeting struct {
 	sites        []string
 	duration     string
+	date         string   // 날짜 (예: 5/5)
 	xray         []Xray
 	physicalExam string   // 물리적 검사
 	extraExam    []any    // 추가적인 검사
@@ -37,6 +38,12 @@ func (fm *FirstMeeting) SetAddphysicalExam(physicalExam string) {
 }
 func (fm *FirstMeeting) SetDuration(duration string) {
 	fm.duration = duration
+}
+func (fm *FirstMeeting) SetDate(date string) {
+	fm.date = date
+}
+func (fm *FirstMeeting) GetDate() string {
+	return fm.date
 }
 func (fm *FirstMeeting) SetPhysicalExam(physicalExam string) {
 	fm.physicalExam = physicalExam
@@ -183,6 +190,7 @@ func (fm *FirstMeeting) IsEmpty() bool {
 func (fm *FirstMeeting) SetReset() {
 	fm.sites = []string{}
 	fm.duration = ""
+	fm.date = ""
 	fm.physicalExam = ""
 	fm.xray = []Xray{}
 	fm.extraExam = []any{}
@@ -238,7 +246,14 @@ func (fm FirstMeeting) GetChartText() string {
 
 	for i, site := range fm.sites {
 		if i == 0 {
-			temp = "cc: " + site + " " + dur + "\n"
+			ccSuffix := dur
+			if fm.date != "" {
+				if ccSuffix != "" {
+					ccSuffix += " "
+				}
+				ccSuffix += fm.date + "~"
+			}
+			temp = "cc: " + site + " " + ccSuffix + "\n"
 		} else {
 			temp += "     " + site + "\n"
 		}
