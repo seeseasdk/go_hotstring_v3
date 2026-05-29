@@ -7,7 +7,7 @@ import (
 type FirstMeeting struct {
 	sites        []string
 	duration     string
-	date         string   // 날짜 (예: 5/5)
+	date         string // 날짜 (예: 5/5)
 	xray         []Xray
 	physicalExam string   // 물리적 검사
 	extraExam    []any    // 추가적인 검사
