@@ -339,6 +339,9 @@ func (c *InputController) Start() {
 				} else if ev.Rawcode >= 96 && ev.Rawcode <= 105 {
 					// 넘패드 숫자 0-9 (Rawcode 96-105)
 					charRune = rune(ev.Rawcode - 96 + 48)
+				} else if ev.Rawcode == 191 || ev.Rawcode == 111 {
+					// / (VK_OEM_2=191, 넘패드 VK_DIVIDE=111) → 날짜 구분자용
+					charRune = '/'
 				}
 
 				if charRune != 0 {
