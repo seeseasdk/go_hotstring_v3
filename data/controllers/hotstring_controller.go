@@ -155,6 +155,11 @@ func (c *HotstringController) Start() {
 									isP = true
 									line = strings.TrimSuffix(line, " p")
 								}
+								isDP := false
+								if strings.HasSuffix(line, " dp") {
+									isDP = true
+									line = strings.TrimSuffix(line, " dp")
+								}
 								isN := false
 								if strings.HasSuffix(line, " n") {
 									isN = true
@@ -223,7 +228,7 @@ func (c *HotstringController) Start() {
 								}
 
 								// Injection 생성
-								inj := models.NewInjection(direction, site, code, "", "", "", isWithCarm, isP, isN, nil)
+								inj := models.NewInjection(direction, site, code, "", "", "", isWithCarm, isP, isDP, isN, nil)
 								inj.SetMx999(mx999)
 								inj.SetIsFromClipboard(true)
 								c.treatments.SetAddInjection(*inj)

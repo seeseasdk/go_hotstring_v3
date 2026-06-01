@@ -12,12 +12,13 @@ type Injection struct {
 	sonoStim        string
 	isWithCarm      bool
 	isP             bool
+	isDP            bool
 	isN             bool
 	isFromClipboard bool
 	etc             any
 }
 
-func NewInjection(direction, site, code, eswtFocus, eswtRadial, sonoStim string, isWithCarm, isP, isN bool, etc any) *Injection {
+func NewInjection(direction, site, code, eswtFocus, eswtRadial, sonoStim string, isWithCarm, isP, isDP, isN bool, etc any) *Injection {
 	return &Injection{
 		direction:       direction,
 		site:            site,
@@ -27,6 +28,7 @@ func NewInjection(direction, site, code, eswtFocus, eswtRadial, sonoStim string,
 		sonoStim:        sonoStim,
 		isWithCarm:      isWithCarm,
 		isP:             isP,
+		isDP:            isDP,
 		isN:             isN,
 		isFromClipboard: false,
 		etc:             etc,
@@ -59,6 +61,9 @@ func (i *Injection) GetIsWithCarm() bool {
 }
 func (i *Injection) GetIsP() bool {
 	return i.isP
+}
+func (i *Injection) GetIsDP() bool {
+	return i.isDP
 }
 func (i *Injection) GetIsN() bool {
 	return i.isN
@@ -96,6 +101,9 @@ func (i *Injection) SetIsWithCarm(isWithCarm bool) {
 func (i *Injection) SetIsP(isP bool) {
 	i.isP = isP
 }
+func (i *Injection) SetIsDP(isDP bool) {
+	i.isDP = isDP
+}
 func (i *Injection) SetIsN(isN bool) {
 	i.isN = isN
 }
@@ -108,12 +116,12 @@ func (i *Injection) SetEtc(etc any) {
 func (i *Injection) ToString() string {
 	return "Direction: " + i.direction + " Site: " + i.site + " Code: " + i.code + " Mx999: " + i.mx999 +
 		" EswtFocus: " + i.eswtFocus + " EswtRadial: " + i.eswtRadial + " SonoStim: " + i.sonoStim +
-		" IsWithCarm: " + fmt.Sprint(i.isWithCarm) + " IsP: " + fmt.Sprint(i.isP) + " IsN: " + fmt.Sprint(i.isN) +
+		" IsWithCarm: " + fmt.Sprint(i.isWithCarm) + " IsP: " + fmt.Sprint(i.isP) + " IsDP: " + fmt.Sprint(i.isDP) + " IsN: " + fmt.Sprint(i.isN) +
 		" Etc: " + fmt.Sprint(i.etc)
 }
 func (i *Injection) IsEmpty() bool {
 	if i.direction == "" && i.site == "" && i.code == "" && i.eswtFocus == "" && i.eswtRadial == "" && i.sonoStim == "" &&
-		!i.isWithCarm && !i.isP && !i.isN && i.etc == nil {
+		!i.isWithCarm && !i.isP && !i.isDP && !i.isN && i.etc == nil {
 		return true
 	}
 	return false

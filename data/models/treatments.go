@@ -266,6 +266,11 @@ func (i Treatments) GetTextForChart() string {
 			p = ""
 		}
 
+		// isDP 처리: p 대신 dp 사용
+		if inject.isDP {
+			p = "dp"
+		}
+
 		// isN 처리 추가
 		if inject.isN {
 			p = "n"
@@ -398,6 +403,12 @@ func (i Treatments) GetTextForSpecific() string {
 		default:
 			p = ""
 		}
+
+		// isDP 처리: p 대신 dp 사용
+		if inject.isDP {
+			p = "dp"
+		}
+
 		// isN 처리 추가
 		if inject.isN {
 			p = "n"
