@@ -950,8 +950,9 @@ var K_Sonos = map[string]*models.Sono{
 }
 
 var K_Drugs = map[string]string{
-	"d":  ".+51",
-	"du": ".+511",
+	"d":  ".+55",  // aceclofenac + lebamefide
+	"de": ".+51",  // aceclofenac + lebamefide + eperisone
+	"du": ".+511", // aceclofenac + lebamefide + eperisone + ultracet
 	"dp": ".+52",
 }
 
