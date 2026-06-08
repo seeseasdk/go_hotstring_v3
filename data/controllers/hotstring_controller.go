@@ -3,6 +3,7 @@
 import (
 	"log/slog"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/constants"
@@ -368,8 +369,15 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 
 	var matches []Match
 
-	// 0. K_Drugs 매치 찾기 (d, du, dp + 숫자. 예: d3, du7)
-	drugRegex := regexp.MustCompile(`(du|dp|d)(\d+)`)
+	// 0. K_Drugs 매치 찾기: K_Drugs 키를 길이 내림차순 정렬해 regex 동적 생성 (긴 키 우선 매치)
+	drugKeys := make([]string, 0, len(hotstrings.K_Drugs))
+	for k := range hotstrings.K_Drugs {
+		drugKeys = append(drugKeys, k)
+	}
+	sort.Slice(drugKeys, func(i, j int) bool {
+		return len(drugKeys[i]) > len(drugKeys[j])
+	})
+	drugRegex := regexp.MustCompile(`(` + strings.Join(drugKeys, "|") + `)(\d+)`)
 	drugMatches := drugRegex.FindAllStringSubmatchIndex(c.buffer, -1)
 	for _, dm := range drugMatches {
 		fullMatchStart := dm[0]
