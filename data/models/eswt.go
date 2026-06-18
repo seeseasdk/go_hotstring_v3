@@ -63,7 +63,7 @@ func (e *ESWT) SetReset() {
 	e.addCode = nil
 }
 func (e *ESWT) IsEmpty() bool {
-	return e.direction == "" && e.focus == "" && e.radial == "" && e.feeType == "" && !e.isOnlyEswt && e.addCode == nil
+	return e.direction == "" && e.focus == "" && e.radial == "" && e.feeType == "" && !e.isOnlyEswt && len(e.addCode) == 0
 }
 func (e *ESWT) ToString() string {
 	return "Direction: " + e.direction + " Focus: " + e.focus + " Radial: " +

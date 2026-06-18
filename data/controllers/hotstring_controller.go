@@ -755,7 +755,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					remainder := c.buffer[remainderPos:]
 					matchedSuffix := false
 
-					if strings.HasPrefix(remainder, "ef") {
+					if strings.HasPrefix(remainder, "ef") && !matchStartPositions[remainderPos+1] {
 						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
 							newEswt := *eswtVal
@@ -777,7 +777,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							remainderPos += 2
 							matchedSuffix = true
 						}
-					} else if strings.HasPrefix(remainder, "er") {
+					} else if strings.HasPrefix(remainder, "er") && !matchStartPositions[remainderPos+1] {
 						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-er Suffix)", "trigger", match.key+"er", "baseKey", match.baseKey)
 							newEswt := *eswtVal
@@ -859,7 +859,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						// 'p'(isP 속성)나 'c'(caudal) 문자가 중간에 끼어 있어도 뒤의 leftover 루프에서 처리할 수 있도록, 무시하고 다음 접미사 탐색을 계속함
 						remainderPos += 1
 						matchedSuffix = true
-					} else if strings.HasPrefix(remainder, "pe") {
+					} else if strings.HasPrefix(remainder, "pe") && !matchStartPositions[remainderPos+1] {
 						// pe(PainEraser)는 e/ef/er/s/p 검색이 모두 끝난 후 마지막으로 검색
 						if peVal, exists := hotstrings.K_PainEraser[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (PainEraser Suffix)", "trigger", match.key+"pe", "baseKey", match.baseKey)
