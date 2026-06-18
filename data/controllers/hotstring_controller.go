@@ -770,7 +770,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
 								useInj = lastBlockInjection
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE, false)
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE, false, []string{})
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -792,7 +792,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
 								useInj = lastBlockInjection
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -811,7 +811,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
 								useInj = lastBlockInjection
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), "normal", false)
+							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), "normal", false, []string{})
 							c.treatments.SetESWT(*eswt)
 							processed[remainderPos] = true
 							remainderPos += 1
@@ -1021,6 +1021,16 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						case ".+999_pm_0":
 							hasPPrefix = true
 						}
+					case []string:
+						for _, code := range etcVal {
+							etcOrderCodes = append(etcOrderCodes, code)
+							switch code {
+							case ".+999_pf_0":
+								hasCPrefix = true
+							case ".+999_pm_0":
+								hasPPrefix = true
+							}
+						}
 					}
 				}
 				hasBlocksMatch = true
@@ -1150,7 +1160,8 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								newEswt.SetFeeType(constants.K_FREE)
 								c.treatments.SetESWT(newEswt)
 							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE, false)
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE, false, []string{})
+
 								c.treatments.SetESWT(*eswt)
 							}
 						}
@@ -1165,7 +1176,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
 								c.treatments.SetESWT(newEswt)
 							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false)
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
 								c.treatments.SetESWT(*eswt)
 							}
 						}
@@ -1178,7 +1189,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
 								c.treatments.SetESWT(*eswtVal)
 							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false)
+								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false, []string{})
 								c.treatments.SetESWT(*eswt)
 							}
 						}
@@ -1493,6 +1504,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		output.AddOrderCodeList(codes)
 		for _, ec := range etcOrderCodes {
 			output.AddOrderCode(ec)
+		}
+		for _, ac := range c.treatments.GetESWTAddCodes() {
+			output.AddOrderCode(ac)
 		}
 
 		drug := c.treatments.GetDrug()

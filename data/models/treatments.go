@@ -33,7 +33,7 @@ func NewTreatments() *Treatments {
 		drug:            "",
 		followUp:        "",
 		clipboardMemos:  []string{},
-		eSWT:            *NewESWT("", "", "", "", false),
+		eSWT:            *NewESWT("", "", "", "", false, []string{}),
 		manual:          *NewManual("", "", nil),
 	}
 }
@@ -894,6 +894,12 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 		result = append(result, i.manual.code)
 	}
 	return result, nil
+}
+func (i Treatments) GetESWTAddCodes() []string {
+	if !i.eSWT.IsEmpty() {
+		return i.eSWT.GetAddCode()
+	}
+	return nil
 }
 func (i Treatments) IsEmpty() bool {
 	return len(i.injections) == 0 &&

@@ -8,15 +8,17 @@ type ESWT struct {
 	radial     string
 	feeType    string
 	isOnlyEswt bool
+	addCode    []string
 }
 
-func NewESWT(direction, focus, radial, feeType string, isOnlyEswt bool) *ESWT {
+func NewESWT(direction, focus, radial, feeType string, isOnlyEswt bool, addCode []string) *ESWT {
 	return &ESWT{
 		direction:  direction,
 		focus:      focus,
 		radial:     radial,
 		feeType:    feeType,
 		isOnlyEswt: isOnlyEswt,
+		addCode:    addCode,
 	}
 }
 func (e *ESWT) GetDirection() string {
@@ -33,6 +35,9 @@ func (e *ESWT) GetFeeType() string {
 }
 func (e *ESWT) GetIsOnlyEswt() bool {
 	return e.isOnlyEswt
+}
+func (e *ESWT) GetAddCode() []string {
+	return e.addCode
 }
 func (e *ESWT) SetDirection(direction string) {
 	e.direction = direction
@@ -55,11 +60,12 @@ func (e *ESWT) SetReset() {
 	e.radial = ""
 	e.feeType = ""
 	e.isOnlyEswt = false
+	e.addCode = nil
 }
 func (e *ESWT) IsEmpty() bool {
-	return e.direction == "" && e.focus == "" && e.radial == "" && e.feeType == "" && !e.isOnlyEswt
+	return e.direction == "" && e.focus == "" && e.radial == "" && e.feeType == "" && !e.isOnlyEswt && e.addCode == nil
 }
 func (e *ESWT) ToString() string {
 	return "Direction: " + e.direction + " Focus: " + e.focus + " Radial: " +
-		e.radial + " FeeType: " + e.feeType + " IsOnlyEswt: " + fmt.Sprint(e.isOnlyEswt)
+		e.radial + " FeeType: " + e.feeType + " IsOnlyEswt: " + fmt.Sprint(e.isOnlyEswt) + " AddCode: " + fmt.Sprint(e.addCode)
 }
