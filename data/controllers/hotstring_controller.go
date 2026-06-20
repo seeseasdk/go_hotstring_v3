@@ -983,13 +983,24 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						// isPeriPContext이면 isWithCarm=true인 etc injection은 건너뜀
 						if isPeriPContext && etcVal.GetIsWithCarm() {
 							// 주사는 건너뛰지만 etc 코드(pf/pm)는 여전히 반영
-							if nestedCode, ok := etcVal.GetEtc().(string); ok {
-								etcOrderCodes = append(etcOrderCodes, nestedCode)
-								switch nestedCode {
+							switch nestedEtc := etcVal.GetEtc().(type) {
+							case string:
+								etcOrderCodes = append(etcOrderCodes, nestedEtc)
+								switch nestedEtc {
 								case ".+999_pf_0":
 									hasCPrefix = true
 								case ".+999_pm_0":
 									hasPPrefix = true
+								}
+							case []string:
+								for _, nestedCode := range nestedEtc {
+									etcOrderCodes = append(etcOrderCodes, nestedCode)
+									switch nestedCode {
+									case ".+999_pf_0":
+										hasCPrefix = true
+									case ".+999_pm_0":
+										hasPPrefix = true
+									}
 								}
 							}
 							break
@@ -1003,13 +1014,24 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							addedInjectionKeys[etcKey] = true
 							c.treatments.SetAddInjection(*etcVal)
 							// 중첩 injection의 etc 코드도 확인
-							if nestedCode, ok := etcVal.GetEtc().(string); ok {
-								etcOrderCodes = append(etcOrderCodes, nestedCode)
-								switch nestedCode {
+							switch nestedEtc := etcVal.GetEtc().(type) {
+							case string:
+								etcOrderCodes = append(etcOrderCodes, nestedEtc)
+								switch nestedEtc {
 								case ".+999_pf_0":
 									hasCPrefix = true
 								case ".+999_pm_0":
 									hasPPrefix = true
+								}
+							case []string:
+								for _, nestedCode := range nestedEtc {
+									etcOrderCodes = append(etcOrderCodes, nestedCode)
+									switch nestedCode {
+									case ".+999_pf_0":
+										hasCPrefix = true
+									case ".+999_pm_0":
+										hasPPrefix = true
+									}
 								}
 							}
 						}
