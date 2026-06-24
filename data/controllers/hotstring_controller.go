@@ -229,7 +229,7 @@ func (c *HotstringController) Start() {
 								}
 
 								// Injection 생성
-								inj := models.NewInjection(direction, site, code, "", "", "", isWithCarm, isP, isDP, isN, nil)
+								inj := models.NewInjection(direction, site, code, "", "", isWithCarm, isP, isDP, isN, nil)
 								inj.SetMx999(mx999)
 								inj.SetIsFromClipboard(true)
 								c.treatments.SetAddInjection(*inj)
@@ -545,7 +545,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 	} else if isEswtMode {
 		// e로 시작하면 K_ESWT_ONLY에서만 찾는다 (연속 다부위 지원, 예: elvbshls → lvb eswt + shl eswt)
-		for k, v := range hotstrings.K_ESWT_ONLY {
+		for k, v := range hotstrings.K_ESWT {
 			idx := 1 // 'e' 이후부터 검색
 			for {
 				if idx >= len(c.buffer) {
@@ -577,7 +577,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 
 		// 3. K_ESWT_ONLY (Prefix 'e') 매치 찾기
-		for k, v := range hotstrings.K_ESWT_ONLY {
+		for k, v := range hotstrings.K_ESWT {
 			target := "e" + k
 			if idx := strings.Index(c.buffer, target); idx != -1 {
 				matches = append(matches, Match{idx, len(target), "ESWT", target, k, v})
@@ -688,6 +688,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	deleteCount := 0
 	output := models.NewOutputStuff(deleteCount, "", "", "", []string{}, "", "", "")
 
+	// ESWT 금지 부위 경고 메시지를 모아서 chartText 맨 마지막에 추가
+	var eswtForbiddenWarnings []string
+
 	// 중복 추가 방지용 추적 맵
 	addedInjectionKeys := make(map[string]bool)
 	addedSimpleTexts := make(map[string]bool)
@@ -756,7 +759,13 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					matchedSuffix := false
 
 					if strings.HasPrefix(remainder, "ef") && !matchStartPositions[remainderPos+1] {
-						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE)
@@ -765,20 +774,39 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							processed[remainderPos+1] = true
 							remainderPos += 2
 							matchedSuffix = true
-						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() != "" {
 							useInj := inj
-							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
-								useInj = lastBlockInjection
+							injEswt := hotstrings.K_ESWT[inj.GetEswtKey()]
+							if injEswt != nil && injEswt.GetFocus() == injEswt.GetRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtKey() != "" {
+								lastEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lastEswt != nil && lastEswt.GetFocus() != lastEswt.GetRadial() {
+									useInj = lastBlockInjection
+									injEswt = lastEswt
+								}
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE, false, []string{})
-							c.treatments.SetESWT(*eswt)
+							if injEswt != nil {
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, []string{})
+								c.treatments.SetESWT(*eswt)
+								processed[remainderPos] = true
+								processed[remainderPos+1] = true
+								remainderPos += 2
+								matchedSuffix = true
+							}
+						} else if _, ok := match.value.(*models.Injection); ok {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "er") && !matchStartPositions[remainderPos+1] {
-						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							processed[remainderPos] = true
+							processed[remainderPos+1] = true
+							remainderPos += 2
+							matchedSuffix = true
+						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-er Suffix)", "trigger", match.key+"er", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
@@ -787,49 +815,88 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							processed[remainderPos+1] = true
 							remainderPos += 2
 							matchedSuffix = true
-						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() != "" {
 							useInj := inj
-							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
-								useInj = lastBlockInjection
+							injEswt := hotstrings.K_ESWT[inj.GetEswtKey()]
+							if injEswt != nil && injEswt.GetFocus() == injEswt.GetRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtKey() != "" {
+								lastEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lastEswt != nil && lastEswt.GetFocus() != lastEswt.GetRadial() {
+									useInj = lastBlockInjection
+									injEswt = lastEswt
+								}
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
-							c.treatments.SetESWT(*eswt)
+							if injEswt != nil {
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
+								c.treatments.SetESWT(*eswt)
+								processed[remainderPos] = true
+								processed[remainderPos+1] = true
+								remainderPos += 2
+								matchedSuffix = true
+							}
+						} else if _, ok := match.value.(*models.Injection); ok {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "e") {
-						if eswtVal, exists := hotstrings.K_ESWT_ONLY[match.baseKey]; exists {
+						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
+						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT Suffix)", "trigger", match.key+"e", "baseKey", match.baseKey)
 							c.treatments.SetESWT(*eswtVal)
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
-						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() != "" {
 							useInj := inj
-							if inj.GetEswtFocus() == inj.GetEswtRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtFocus() != lastBlockInjection.GetEswtRadial() {
-								useInj = lastBlockInjection
+							injEswt := hotstrings.K_ESWT[inj.GetEswtKey()]
+							if injEswt != nil && injEswt.GetFocus() == injEswt.GetRadial() && lastBlockInjection != nil && lastBlockInjection.GetEswtKey() != "" {
+								lastEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lastEswt != nil && lastEswt.GetFocus() != lastEswt.GetRadial() {
+									useInj = lastBlockInjection
+									injEswt = lastEswt
+								}
 							}
-							eswt := models.NewESWT(useInj.GetDirection(), useInj.GetEswtFocus(), useInj.GetEswtRadial(), "normal", false, []string{})
-							c.treatments.SetESWT(*eswt)
+							if injEswt != nil {
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), "normal", false, []string{})
+								c.treatments.SetESWT(*eswt)
+								processed[remainderPos] = true
+								remainderPos += 1
+								matchedSuffix = true
+							}
+						} else if _, ok := match.value.(*models.Injection); ok {
+							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "s") {
-						if sntVal, exists := hotstrings.K_SonoStim[match.baseKey]; exists {
+						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
+							// eswt 금지 부위는 sonostim도 금지
+							processed[remainderPos] = true
+							remainderPos += 1
+							matchedSuffix = true
+						} else if sntVal, exists := hotstrings.K_SonoStim[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (SonoStim Suffix)", "trigger", match.key+"s", "baseKey", match.baseKey)
 							// interscapular 등 specific sonostim이 있으면 generic(TPZ/lower back) 대신 사용
 							if specificSonoStimInj != nil && (sntVal.GetSite() == "TPZ" || sntVal.GetSite() == "lower back") {
 								sntCode := constants.K_SINGLE_SNT
 								if specificSonoStimInj.GetDirection() == constants.K_BOTH {
-									if specificSonoStimInj.GetEswtFocus() != "TPZ" && specificSonoStimInj.GetEswtFocus() != "lower back" {
+									specEswt := hotstrings.K_ESWT[specificSonoStimInj.GetEswtKey()]
+									if specEswt != nil && specEswt.GetFocus() != "TPZ" && specEswt.GetFocus() != "lower back" {
 										sntCode = constants.K_BOTH_SNT
 									}
 								}
-								overrideSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specificSonoStimInj.GetSonoStim(), sntCode)
-								c.treatments.SetAddExtraTreatments(*overrideSnt)
+								specSnt := hotstrings.K_SonoStim[specificSonoStimInj.GetSonoStim()]
+								if specSnt != nil {
+									overrideSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specSnt.GetSite(), sntCode)
+									c.treatments.SetAddExtraTreatments(*overrideSnt)
+								}
 							} else {
 								c.treatments.SetAddExtraTreatments(*sntVal)
 							}
@@ -838,22 +905,23 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							matchedSuffix = true
 						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetSonoStim() != "" {
 							useInj := inj
+							injSnt := hotstrings.K_SonoStim[inj.GetSonoStim()]
 							// interscapular 등 specific sonostim이 있으면 generic(TPZ/lower back) 대신 사용
-							if specificSonoStimInj != nil && (inj.GetSonoStim() == "TPZ" || inj.GetSonoStim() == "lower back") {
+							if specificSonoStimInj != nil && injSnt != nil && (injSnt.GetSite() == "TPZ" || injSnt.GetSite() == "lower back") {
 								useInj = specificSonoStimInj
+								injSnt = hotstrings.K_SonoStim[useInj.GetSonoStim()]
 							}
-							sntCode := constants.K_SINGLE_SNT
-							if useInj.GetDirection() == constants.K_BOTH {
-								eswtFocus := useInj.GetEswtFocus()
-								if eswtFocus != "TPZ" && eswtFocus != "lower back" {
+							if injSnt != nil {
+								sntCode := constants.K_SINGLE_SNT
+								if useInj.GetDirection() == constants.K_BOTH && (injSnt.GetSite() != "TPZ" && injSnt.GetSite() != "lower back") {
 									sntCode = constants.K_BOTH_SNT
 								}
+								snt := models.NewSonoStim(useInj.GetDirection(), injSnt.GetSite(), sntCode)
+								c.treatments.SetAddExtraTreatments(*snt)
+								processed[remainderPos] = true
+								remainderPos += 1
+								matchedSuffix = true
 							}
-							snt := models.NewSonoStim(useInj.GetDirection(), useInj.GetSonoStim(), sntCode)
-							c.treatments.SetAddExtraTreatments(*snt)
-							processed[remainderPos] = true
-							remainderPos += 1
-							matchedSuffix = true
 						}
 					} else if remainder[0] == 'p' || remainder[0] == 'c' {
 						// 'p'(isP 속성)나 'c'(caudal) 문자가 중간에 끼어 있어도 뒤의 leftover 루프에서 처리할 수 있도록, 무시하고 다음 접미사 탐색을 계속함
@@ -868,13 +936,16 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							processed[remainderPos+1] = true
 							remainderPos += 2
 							matchedSuffix = true
-						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtFocus() != "" {
-							pe := models.NewPainEraser(inj.GetDirection(), inj.GetEswtFocus(), "pe0")
-							c.treatments.SetAddExtraTreatments(*pe)
-							processed[remainderPos] = true
-							processed[remainderPos+1] = true
-							remainderPos += 2
-							matchedSuffix = true
+						} else if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() != "" {
+							injEswt := hotstrings.K_ESWT[inj.GetEswtKey()]
+							if injEswt != nil {
+								pe := models.NewPainEraser(inj.GetDirection(), injEswt.GetFocus(), "pe0")
+								c.treatments.SetAddExtraTreatments(*pe)
+								processed[remainderPos] = true
+								processed[remainderPos+1] = true
+								remainderPos += 2
+								matchedSuffix = true
+							}
 						}
 					}
 
@@ -1059,7 +1130,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				lastBlockBaseKey = match.baseKey
 				lastBlockInjection = injection
 				// interscapular sonostim (cm5/cf5 계열) 기록
-				if injection.GetSonoStim() == "interscapular" {
+				if sntObj := hotstrings.K_SonoStim[injection.GetSonoStim()]; sntObj != nil && sntObj.GetSite() == "interscapular" {
 					specificSonoStimInj = injection
 				}
 			case "Simples":
@@ -1131,9 +1202,12 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					if lastBlockInjection != nil {
 						if peVal, exists := hotstrings.K_PainEraser[lastBlockBaseKey]; exists {
 							c.treatments.SetAddExtraTreatments(*peVal)
-						} else if lastBlockInjection.GetEswtFocus() != "" {
-							pe := models.NewPainEraser(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), "pe0")
-							c.treatments.SetAddExtraTreatments(*pe)
+						} else if lastBlockInjection.GetEswtKey() != "" {
+							peEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+							if peEswt != nil {
+								pe := models.NewPainEraser(lastBlockInjection.GetDirection(), peEswt.GetFocus(), "pe0")
+								c.treatments.SetAddExtraTreatments(*pe)
+							}
 						}
 					}
 					processed[i] = true
@@ -1177,14 +1251,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					if i+1 < len(c.buffer) && !processed[i+1] && c.buffer[i+1] == 'f' {
 						// ef 잔여 → K_FREE (ef) focus+radial, 코드 .+999_ef
 						if lastBlockInjection != nil {
-							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
-								newEswt := *eswtVal
-								newEswt.SetFeeType(constants.K_FREE)
-								c.treatments.SetESWT(newEswt)
-							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE, false, []string{})
-
-								c.treatments.SetESWT(*eswt)
+							if lastBlockInjection.GetEswtKey() != "" {
+								lbEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lbEswt != nil {
+									eswt := models.NewESWT(lastBlockInjection.GetDirection(), lbEswt.GetFocus(), lbEswt.GetRadial(), constants.K_FREE, false, []string{})
+									c.treatments.SetESWT(*eswt)
+								}
+							} else {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+lastBlockBaseKey+" eswt는 금지 부위 입니다")
 							}
 						}
 						processed[i] = true
@@ -1193,13 +1267,14 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					} else if i+1 < len(c.buffer) && !processed[i+1] && c.buffer[i+1] == 'r' {
 						// er 잔여 → K_FREE_RADIAL_ONLY (ef) radial only, 코드 .+999_ef
 						if lastBlockInjection != nil {
-							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
-								newEswt := *eswtVal
-								newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
-								c.treatments.SetESWT(newEswt)
-							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
-								c.treatments.SetESWT(*eswt)
+							if lastBlockInjection.GetEswtKey() != "" {
+								lbEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lbEswt != nil {
+									eswt := models.NewESWT(lastBlockInjection.GetDirection(), lbEswt.GetFocus(), lbEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
+									c.treatments.SetESWT(*eswt)
+								}
+							} else {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+lastBlockBaseKey+" eswt는 금지 부위 입니다")
 							}
 						}
 						processed[i] = true
@@ -1208,38 +1283,44 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					} else {
 						// e 단독 → K_NORMAL (e) focus+radial
 						if lastBlockInjection != nil {
-							if eswtVal, exists := hotstrings.K_ESWT_ONLY[lastBlockBaseKey]; exists {
-								c.treatments.SetESWT(*eswtVal)
-							} else if lastBlockInjection.GetEswtFocus() != "" {
-								eswt := models.NewESWT(lastBlockInjection.GetDirection(), lastBlockInjection.GetEswtFocus(), lastBlockInjection.GetEswtRadial(), "normal", false, []string{})
-								c.treatments.SetESWT(*eswt)
+							if lastBlockInjection.GetEswtKey() != "" {
+								lbEswt := hotstrings.K_ESWT[lastBlockInjection.GetEswtKey()]
+								if lbEswt != nil {
+									eswt := models.NewESWT(lastBlockInjection.GetDirection(), lbEswt.GetFocus(), lbEswt.GetRadial(), "normal", false, []string{})
+									c.treatments.SetESWT(*eswt)
+								}
+							} else {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+lastBlockBaseKey+" eswt는 금지 부위 입니다")
 							}
 						}
 						processed[i] = true
 					}
 				} else if c.buffer[i] == 's' {
-					if lastBlockInjection != nil {
+					if lastBlockInjection != nil && lastBlockInjection.GetEswtKey() != "" {
 						// interscapular 등 specific sonostim 우선 적용
 						useInj := lastBlockInjection
-						if specificSonoStimInj != nil && (lastBlockInjection.GetSonoStim() == "TPZ" || lastBlockInjection.GetSonoStim() == "lower back") {
+						lbSnt := hotstrings.K_SonoStim[lastBlockInjection.GetSonoStim()]
+						// interscapular 등 specific sonostim 우선 적용
+						if specificSonoStimInj != nil && lbSnt != nil && (lbSnt.GetSite() == "TPZ" || lbSnt.GetSite() == "lower back") {
 							useInj = specificSonoStimInj
+							lbSnt = hotstrings.K_SonoStim[useInj.GetSonoStim()]
 						}
 						sntCode := constants.K_SINGLE_SNT
-						if useInj.GetDirection() == constants.K_BOTH {
-							eswtFocus := useInj.GetEswtFocus()
-							if eswtFocus != "TPZ" && eswtFocus != "lower back" {
-								sntCode = constants.K_BOTH_SNT
-							}
+						if useInj.GetDirection() == constants.K_BOTH && lbSnt != nil && lbSnt.GetSite() != "TPZ" && lbSnt.GetSite() != "lower back" {
+							sntCode = constants.K_BOTH_SNT
 						}
 						if sntVal, exists := hotstrings.K_SonoStim[lastBlockBaseKey]; exists {
 							if specificSonoStimInj != nil && (sntVal.GetSite() == "TPZ" || sntVal.GetSite() == "lower back") {
-								newSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specificSonoStimInj.GetSonoStim(), sntCode)
-								c.treatments.SetAddExtraTreatments(*newSnt)
+								specSnt := hotstrings.K_SonoStim[specificSonoStimInj.GetSonoStim()]
+								if specSnt != nil {
+									newSnt := models.NewSonoStim(specificSonoStimInj.GetDirection(), specSnt.GetSite(), sntCode)
+									c.treatments.SetAddExtraTreatments(*newSnt)
+								}
 							} else {
 								c.treatments.SetAddExtraTreatments(*sntVal)
 							}
-						} else if lastBlockInjection.GetSonoStim() != "" {
-							snt := models.NewSonoStim(useInj.GetDirection(), useInj.GetSonoStim(), sntCode)
+						} else if lastBlockInjection.GetSonoStim() != "" && lbSnt != nil {
+							snt := models.NewSonoStim(useInj.GetDirection(), lbSnt.GetSite(), sntCode)
 							c.treatments.SetAddExtraTreatments(*snt)
 						}
 					}
@@ -1618,6 +1699,17 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					output.SetChartText(ct + strings.Join(warnings, "\n") + "\n")
 				}
 			}
+		}
+	}
+
+	// ESWT 금지 부위 경고를 chartText 맨 마지막에 추가
+	if len(eswtForbiddenWarnings) > 0 {
+		ct := output.GetChartText()
+		warn := strings.Join(eswtForbiddenWarnings, "\n")
+		if ct != "" {
+			output.SetChartText(ct + "\n" + warn)
+		} else {
+			output.SetChartText(warn)
 		}
 	}
 

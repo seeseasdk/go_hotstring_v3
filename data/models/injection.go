@@ -7,8 +7,7 @@ type Injection struct {
 	direction       string
 	site            string
 	code            string
-	eswtFocus       string
-	eswtRadial      string
+	eswtKey         string
 	sonoStim        string
 	isWithCarm      bool
 	isP             bool
@@ -18,13 +17,12 @@ type Injection struct {
 	etc             any
 }
 
-func NewInjection(direction, site, code, eswtFocus, eswtRadial, sonoStim string, isWithCarm, isP, isDP, isN bool, etc any) *Injection {
+func NewInjection(direction, site, code, eswtKey, sonoStim string, isWithCarm, isP, isDP, isN bool, etc any) *Injection {
 	return &Injection{
 		direction:       direction,
 		site:            site,
 		code:            code,
-		eswtFocus:       eswtFocus,
-		eswtRadial:      eswtRadial,
+		eswtKey:         eswtKey,
 		sonoStim:        sonoStim,
 		isWithCarm:      isWithCarm,
 		isP:             isP,
@@ -47,11 +45,8 @@ func (i *Injection) GetCode() string {
 func (i *Injection) GetMx999() string {
 	return i.mx999
 }
-func (i *Injection) GetEswtFocus() string {
-	return i.eswtFocus
-}
-func (i *Injection) GetEswtRadial() string {
-	return i.eswtRadial
+func (i *Injection) GetEswtKey() string {
+	return i.eswtKey
 }
 func (i *Injection) GetSonoStim() string {
 	return i.sonoStim
@@ -86,11 +81,8 @@ func (i *Injection) SetCode(code string) {
 func (i *Injection) SetMx999(mx999 string) {
 	i.mx999 = mx999
 }
-func (i *Injection) SetEswtFocus(eswtFocus string) {
-	i.eswtFocus = eswtFocus
-}
-func (i *Injection) SetEswtRadial(eswtRadial string) {
-	i.eswtRadial = eswtRadial
+func (i *Injection) SetEswtKey(eswtKey string) {
+	i.eswtKey = eswtKey
 }
 func (i *Injection) SetSonoStim(sonoStim string) {
 	i.sonoStim = sonoStim
@@ -115,12 +107,12 @@ func (i *Injection) SetEtc(etc any) {
 }
 func (i *Injection) ToString() string {
 	return "Direction: " + i.direction + " Site: " + i.site + " Code: " + i.code + " Mx999: " + i.mx999 +
-		" EswtFocus: " + i.eswtFocus + " EswtRadial: " + i.eswtRadial + " SonoStim: " + i.sonoStim +
+		" EswtKey: " + i.eswtKey + " SonoStim: " + i.sonoStim +
 		" IsWithCarm: " + fmt.Sprint(i.isWithCarm) + " IsP: " + fmt.Sprint(i.isP) + " IsDP: " + fmt.Sprint(i.isDP) + " IsN: " + fmt.Sprint(i.isN) +
 		" Etc: " + fmt.Sprint(i.etc)
 }
 func (i *Injection) IsEmpty() bool {
-	if i.direction == "" && i.site == "" && i.code == "" && i.eswtFocus == "" && i.eswtRadial == "" && i.sonoStim == "" &&
+	if i.direction == "" && i.site == "" && i.code == "" && i.eswtKey == "" && i.sonoStim == "" &&
 		!i.isWithCarm && !i.isP && !i.isDP && !i.isN && i.etc == nil {
 		return true
 	}
