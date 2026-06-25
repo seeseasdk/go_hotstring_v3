@@ -785,7 +785,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 							}
 							if injEswt != nil {
-								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, []string{})
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, injEswt.GetAddCode())
 								c.treatments.SetESWT(*eswt)
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
@@ -826,7 +826,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 							}
 							if injEswt != nil {
-								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, []string{})
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, injEswt.GetAddCode())
 								c.treatments.SetESWT(*eswt)
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
@@ -863,7 +863,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 							}
 							if injEswt != nil {
-								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), "normal", false, []string{})
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), "normal", false, injEswt.GetAddCode())
 								c.treatments.SetESWT(*eswt)
 								processed[remainderPos] = true
 								remainderPos += 1
