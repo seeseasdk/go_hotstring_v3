@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/constants"
 	"github.com/seeseasdk/go_hotstring_v3/data/hotstrings"
@@ -1719,8 +1720,18 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	// 매칭된 글자 수 + 트리거 키 1 = deleteCount
+	// 한국어 등 멀티바이트 문자 처리: 바이트 수 대신 룬(문자) 단위로 카운트
 	if !isClipboard {
-		deleteCount = len(processed)
+		deleteCount = 0
+		{
+			byteIdx := 0
+			for _, r := range c.buffer {
+				if processed[byteIdx] {
+					deleteCount++
+				}
+				byteIdx += utf8.RuneLen(r)
+			}
+		}
 		slog.Info("[DELETE] processed map size", "processedLen", deleteCount, "buffer", c.buffer, "bufferLen", len(c.buffer))
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
