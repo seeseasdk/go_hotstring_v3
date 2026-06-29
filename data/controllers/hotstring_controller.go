@@ -1,4 +1,4 @@
-﻿package controllers
+package controllers
 
 import (
 	"log/slog"
@@ -913,7 +913,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							}
 							if injSnt != nil {
 								sntCode := constants.K_SINGLE_SNT
-								if useInj.GetDirection() == constants.K_BOTH && (injSnt.GetSite() != "TPZ" && injSnt.GetSite() != "lower back") {
+								if useInj.GetDirection() == constants.K_BOTH && (injSnt.GetSite() != "TPZ" && injSnt.GetSite() != "lower back" && injSnt.GetSite() != "interscapular") {
 									sntCode = constants.K_BOTH_SNT
 								}
 								snt := models.NewSonoStim(useInj.GetDirection(), injSnt.GetSite(), sntCode)
@@ -1306,7 +1306,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							lbSnt = hotstrings.K_SonoStim[useInj.GetSonoStim()]
 						}
 						sntCode := constants.K_SINGLE_SNT
-						if useInj.GetDirection() == constants.K_BOTH && lbSnt != nil && lbSnt.GetSite() != "TPZ" && lbSnt.GetSite() != "lower back" {
+						if useInj.GetDirection() == constants.K_BOTH && lbSnt != nil && lbSnt.GetSite() != "TPZ" && lbSnt.GetSite() != "lower back" && lbSnt.GetSite() != "interscapular" {
 							sntCode = constants.K_BOTH_SNT
 						}
 						if sntVal, exists := hotstrings.K_SonoStim[lastBlockBaseKey]; exists {
