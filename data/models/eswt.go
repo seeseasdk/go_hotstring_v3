@@ -54,6 +54,9 @@ func (e *ESWT) SetFeeType(feeType string) {
 func (e *ESWT) SetIsOnlyEswt(isOnlyEswt bool) {
 	e.isOnlyEswt = isOnlyEswt
 }
+func (e *ESWT) SetAddCode(addCode []string) {
+	e.addCode = addCode
+}
 func (e *ESWT) SetReset() {
 	e.direction = ""
 	e.focus = ""

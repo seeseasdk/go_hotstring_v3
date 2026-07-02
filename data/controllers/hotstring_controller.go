@@ -770,6 +770,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE)
+							newEswt.SetAddCode(nil)
 							c.treatments.SetESWT(newEswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -786,7 +787,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 							}
 							if injEswt != nil {
-								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, injEswt.GetAddCode())
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, nil)
 								c.treatments.SetESWT(*eswt)
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
@@ -811,6 +812,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							slog.Debug("Hotstring Triggered (ESWT-er Suffix)", "trigger", match.key+"er", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
+							newEswt.SetAddCode(nil)
 							c.treatments.SetESWT(newEswt)
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
@@ -827,7 +829,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 							}
 							if injEswt != nil {
-								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, injEswt.GetAddCode())
+								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, nil)
 								c.treatments.SetESWT(*eswt)
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
@@ -1626,7 +1628,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		if area, exists := hotstrings.K_Magnetics[lastBlockBaseKey]; exists {
 			magneticArea = " " + area
 		}
-		insert := "pt) saso\n     magnetic" + magneticArea + "\n"
+		insert := "pt) 사소\n     자기장" + magneticArea + "\n"
 		if strings.Contains(ct, "f/u)") {
 			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
 		} else if ct != "" {
@@ -1644,7 +1646,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		if area, exists := hotstrings.K_Magnetics[lastBlockBaseKey]; exists {
 			magneticArea = " " + area
 		}
-		insert := "pt) magnetic" + magneticArea + "\n"
+		insert := "pt) 자기장" + magneticArea + "\n"
 		if strings.Contains(ct, "f/u)") {
 			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
 		} else if ct != "" {
