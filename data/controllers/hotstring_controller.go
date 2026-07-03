@@ -1193,6 +1193,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			}
 		}
 	}
+	// e 모드(ESWT mode)에서 followUp이 설정되지 않은 경우 7일 후 f/u 자동 설정
+	if isEswtMode && c.treatments.GetFollowUp() == "" {
+		c.treatments.SetFollowUp("7")
+	}
+
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
 	// Blocks 매치가 있을 때만 실행 (simple 입력만 있을 때 불필요한 caudal/isP 트리거 방지)
 	leftoverP := false
