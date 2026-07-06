@@ -1612,6 +1612,13 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 
 		codes, _ := c.treatments.GetOrderCode()
+		if hasCPrefix || hasPPrefix {
+			for idx, code := range codes {
+				if code == constants.K_SINGLE_ESWT {
+					codes[idx] = constants.K_SINGLE_ADD_ESWT
+				}
+			}
+		}
 		output.AddOrderCodeList(codes)
 		for _, ec := range etcOrderCodes {
 			output.AddOrderCode(ec)
