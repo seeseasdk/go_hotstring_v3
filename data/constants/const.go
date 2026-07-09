@@ -23,6 +23,7 @@ const (
 	K_NORMAL           = "normal"
 	K_FREE             = "free"
 	K_FREE_RADIAL_ONLY = "free_radial_only"
+	K_CR               = "cr"
 
 	K_mouse_click     = "mouse_click"
 	K_text_typing     = "text_typing"

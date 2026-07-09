@@ -329,6 +329,8 @@ func (i Treatments) GetTextForChart() string {
 			for _, e := range extraEswts {
 				text += "                 " + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
+		case constants.K_CR:
+			text += "cr) " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + ", " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 		}
 	}
 	if !i.manual.IsEmpty() {
@@ -488,6 +490,8 @@ func (i Treatments) GetTextForSpecific() string {
 			for _, e := range extraEswts {
 				text += strings.Repeat(" ", len(eswtPrefix)+23) + e.GetDirection() + " " + e.GetRadial() + "\n"
 			}
+		case constants.K_CR:
+			text += eswtPrefix + "cr) " + i.eSWT.GetDirection() + " " + i.eSWT.GetFocus() + ", " + i.eSWT.GetDirection() + " " + i.eSWT.GetRadial() + "\n"
 		}
 		_ = contCont
 		_ = radialCont
@@ -866,6 +870,8 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 				result = append(result, constants.K_ESWT_FREE)
 			case constants.K_FREE_RADIAL_ONLY:
 				result = append(result, constants.K_ESWT_FREE_RADIAL)
+			case constants.K_CR:
+				result = append(result, constants.K_CHEMI)
 			default:
 				return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 			}
@@ -885,6 +891,8 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 				result = append(result, constants.K_ESWT_FREE)
 			case constants.K_FREE_RADIAL_ONLY:
 				result = append(result, constants.K_ESWT_FREE_RADIAL)
+			case constants.K_CR:
+				result = append(result, constants.K_CHEMI)
 			default:
 				return nil, fmt.Errorf("unknown ESWT fee type: %s", i.eSWT.GetFeeType())
 			}

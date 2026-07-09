@@ -18,13 +18,15 @@ type HotstringController struct {
 	treatments         *models.Treatments
 	isMuting           bool   // TypeStr 출력 중 버퍼 추가 차단
 	clipboardChartText string // Ctrl+* 트리거시 f/u) 날짜 갱신된 chartText 임시 저장
+	useLegacyEswt      bool   // true: c/p 트리거 ESWT를 e) 형식(이전), false: cr) 형식(현재)
 }
 
-func NewHotstringController(cc *ChannelController) *HotstringController {
+func NewHotstringController(cc *ChannelController, useLegacyEswt bool) *HotstringController {
 	return &HotstringController{
-		cc:         cc,
-		buffer:     "",
-		treatments: models.NewTreatments(),
+		cc:            cc,
+		buffer:        "",
+		treatments:    models.NewTreatments(),
+		useLegacyEswt: useLegacyEswt,
 	}
 }
 
@@ -698,6 +700,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 
 	var combinedFirstMeeting *models.FirstMeeting
 	hasBlocksMatch := false
+	isFirstBlocksCOrP := false
 	hasCPrefix := false
 	hasPPrefix := false
 	var etcOrderCodes []string
@@ -1129,6 +1132,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						}
 					}
 				}
+				if !hasBlocksMatch {
+					if match.category == "Blocks-C" || match.category == "Blocks-P" {
+						isFirstBlocksCOrP = true
+					}
+				}
 				hasBlocksMatch = true
 				lastBlockBaseKey = match.baseKey
 				lastBlockInjection = injection
@@ -1343,6 +1351,16 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 	if leftoverN {
 		c.treatments.SetAllInjectionsIsN(true)
+	}
+
+	// c/p 트리거에서 ESWT가 설정된 경우: feeType을 K_CR로 변경하고 addCode 제거
+	if isFirstBlocksCOrP && !c.useLegacyEswt {
+		eswt := c.treatments.GetESWT()
+		if !(&eswt).IsEmpty() {
+			eswt.SetFeeType(constants.K_CR)
+			eswt.SetAddCode(nil)
+			c.treatments.SetESWT(eswt)
+		}
 	}
 
 	// 모드 프리픽스 문자(z/x/s/e)는 별도로 processed에 표시

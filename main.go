@@ -10,6 +10,9 @@ import (
 )
 
 func main() {
+	// true: c/p 트리거 ESWT를 e) 형식(이전) 주사 eswt처방 , false: cr) 형식(현재) -> chemirosa 처방
+	const useLegacyEswt = false
+
 	logger := prettylog.InitLogger()
 	logger.Info("Application started")
 
@@ -18,7 +21,7 @@ func main() {
 
 	// Initialize Controllers
 	outputController := controllers.NewOutputController(cc)
-	hotstringController := controllers.NewHotstringController(cc)
+	hotstringController := controllers.NewHotstringController(cc, useLegacyEswt)
 	inputController := controllers.NewInputController(cc)
 
 	// Start Controllers
