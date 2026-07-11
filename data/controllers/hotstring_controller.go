@@ -1634,6 +1634,17 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		} else {
 			chartText := output.GetChartText()
 			newChartText := c.treatments.GetTextForChart()
+			if isClipboard && newChartText != "" {
+				lines := strings.Split(newChartText, "\n")
+				for idx, line := range lines {
+					trimmed := strings.TrimLeft(line, " ")
+					spaces := len(line) - len(trimmed)
+					if spaces >= 5 && strings.HasPrefix(trimmed, "cr)") {
+						lines[idx] = strings.Repeat(" ", spaces-5) + trimmed
+					}
+				}
+				newChartText = strings.Join(lines, "\n")
+			}
 			if newChartText != "" {
 				if chartText != "" {
 					output.SetChartText(chartText + "\n" + newChartText)
@@ -1758,6 +1769,22 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				firstDir != secondDir {
 				warnings = append(warnings, "★★★ 주사 방향 불일치 경고")
 				warnings = append(warnings, "★★★ "+firstDir+" vs "+secondDir)
+			}
+
+			// Rule 4: 경추 치료 + caudal 조합
+			hasCervicalAny := false
+			hasCaudalAny := false
+			for _, inj := range realInj {
+				if isCervicalSpineInj(inj.GetSite()) {
+					hasCervicalAny = true
+				}
+				if inj.GetSite() == "caudal" {
+					hasCaudalAny = true
+				}
+			}
+			if hasCervicalAny && hasCaudalAny {
+				warnings = append(warnings, "★★★ 경추치료 + Caudal 조합 경고")
+				warnings = append(warnings, "★★★ 처방을 다시 확인하세요")
 			}
 
 			if len(warnings) > 0 {
