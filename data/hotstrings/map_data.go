@@ -666,6 +666,8 @@ var K_FirstMeeting = map[string]*models.FirstMeeting{
 	"ril":  models.NewFirstMeeting([]string{"Lt. chest / back pain"}, "", []models.Xray{*K_Xrays["ril"]}, []any{}),
 	"st":   models.NewFirstMeeting([]string{"sternum pain"}, "", []models.Xray{*K_Xrays["st"]}, []any{}),
 	"pv":   models.NewFirstMeeting([]string{"pelvic pain"}, "", []models.Xray{*K_Xrays["pv"]}, []any{}),
+	"pvr":  models.NewFirstMeeting([]string{"Rt. pelvic pain"}, "", []models.Xray{*K_Xrays["pv"]}, []any{}),
+	"pvl":  models.NewFirstMeeting([]string{"Lt. pelvic pain"}, "", []models.Xray{*K_Xrays["pv"]}, []any{}),
 	"cx":   models.NewFirstMeeting([]string{"coccyx pain"}, "", []models.Xray{*K_Xrays["cx"]}, []any{}),
 	"shb":  models.NewFirstMeeting([]string{"both shoulder pain"}, "cis -/-, td + TPZ ext rot -/-, flex -/-, exten -/-, adduc -/-", []models.Xray{*K_Xrays["shb"], *K_Xrays["cvb"]}, []any{K_Sonos["shb"]}),
 	"shr":  models.NewFirstMeeting([]string{"Rt. shoulder pain"}, "cis -/-, td + TPZ ext rot -/-, flex -/-, exten -/-, adduc -/-", []models.Xray{*K_Xrays["shr"], *K_Xrays["cvr"]}, []any{K_Sonos["shr"]}),
