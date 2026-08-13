@@ -135,8 +135,8 @@ func (c *HotstringController) Start() {
 								continue
 							}
 
-							// e) 나 ef) 혹은 snt) 나 pe) 나 pt) 로 시작하는 건 주사가 아니므로 제외
-							if strings.HasPrefix(line, "e) ") || strings.HasPrefix(line, "ef) ") || strings.HasPrefix(line, "snt) ") || strings.HasPrefix(line, "pe) ") || strings.HasPrefix(line, "pt) ") {
+							// e) 나 ef) 혹은 snt) 나 pe) 나 pt) 나 cr) 로 시작하는 건 주사가 아니므로 제외
+							if strings.HasPrefix(line, "e) ") || strings.HasPrefix(line, "ef) ") || strings.HasPrefix(line, "snt) ") || strings.HasPrefix(line, "pe) ") || strings.HasPrefix(line, "pt) ") || strings.HasPrefix(line, "cr) ") {
 								isWithCarm = false
 								isPeri = false
 								lastIsWithCarm = false
