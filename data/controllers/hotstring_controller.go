@@ -356,6 +356,16 @@ func isLowerLimbInj(site string) bool {
 		site == "foot"
 }
 
+// isEswtWarnSite reports whether the eswtKey is a soft-warn site (ESWT/sonostim proceeds but shows a warning).
+func isEswtWarnSite(eswtKey string) bool {
+	for _, pfx := range []string{"wr", "ap", "tf", "ha", "fi", "ak", "ft", "st"} {
+		if strings.HasPrefix(eswtKey, pfx) {
+			return true
+		}
+	}
+	return false
+}
+
 // processBuffer scans the buffer and extracts matches sequentially by position
 func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) *models.OutputStuff {
 	// 모든 가능한 매치를 찾아서 위치별로 정렬
@@ -452,6 +462,10 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	if isFirstMeetingMode {
+		// duration 범위를 미리 계산해서 Simples 매칭 시 겹침 방지 (예: zlvbf1mmm → f1m + mm)
+		zDurRe := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
+		zDurLoc := zDurRe.FindStringIndex(c.buffer)
+
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting + K_Simples을 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
 		for k, v := range hotstrings.K_FirstMeeting {
 			idx := 1 // 'z' 이후부터 검색
@@ -475,11 +489,21 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				if idx >= len(c.buffer) {
 					break
 				}
+				// duration 범위 안이면 duration 끝 이후로 건너뜀
+				if zDurLoc != nil && idx >= zDurLoc[0] && idx < zDurLoc[1] {
+					idx = zDurLoc[1]
+					continue
+				}
 				foundIdx := strings.Index(c.buffer[idx:], k)
 				if foundIdx == -1 {
 					break
 				}
 				actualPos := idx + foundIdx
+				// duration 범위와 겹치는 매치는 건너뜀
+				if zDurLoc != nil && actualPos < zDurLoc[1] && actualPos+len(k) > zDurLoc[0] {
+					idx = actualPos + 1
+					continue
+				}
 				matches = append(matches, Match{actualPos, len(k), "Simples", k, k, v})
 				idx = actualPos + len(k)
 			}
@@ -760,18 +784,15 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					matchedSuffix := false
 
 					if strings.HasPrefix(remainder, "ef") && !matchStartPositions[remainderPos+1] {
-						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
-							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
-							processed[remainderPos] = true
-							processed[remainderPos+1] = true
-							remainderPos += 2
-							matchedSuffix = true
-						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
+						if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-ef Suffix)", "trigger", match.key+"ef", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE)
 							newEswt.SetAddCode(nil)
 							c.treatments.SetESWT(newEswt)
+							if inj, ok := match.value.(*models.Injection); ok && isEswtWarnSite(inj.GetEswtKey()) {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							}
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
@@ -789,6 +810,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if injEswt != nil {
 								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE, false, nil)
 								c.treatments.SetESWT(*eswt)
+								if isEswtWarnSite(inj.GetEswtKey()) {
+									eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+								}
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
 								remainderPos += 2
@@ -802,18 +826,15 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "er") && !matchStartPositions[remainderPos+1] {
-						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
-							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
-							processed[remainderPos] = true
-							processed[remainderPos+1] = true
-							remainderPos += 2
-							matchedSuffix = true
-						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
+						if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-er Suffix)", "trigger", match.key+"er", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_FREE_RADIAL_ONLY)
 							newEswt.SetAddCode(nil)
 							c.treatments.SetESWT(newEswt)
+							if inj, ok := match.value.(*models.Injection); ok && isEswtWarnSite(inj.GetEswtKey()) {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							}
 							processed[remainderPos] = true
 							processed[remainderPos+1] = true
 							remainderPos += 2
@@ -831,6 +852,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if injEswt != nil {
 								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_FREE_RADIAL_ONLY, false, nil)
 								c.treatments.SetESWT(*eswt)
+								if isEswtWarnSite(inj.GetEswtKey()) {
+									eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+								}
 								processed[remainderPos] = true
 								processed[remainderPos+1] = true
 								remainderPos += 2
@@ -844,14 +868,12 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "e") {
-						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
-							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
-							processed[remainderPos] = true
-							remainderPos += 1
-							matchedSuffix = true
-						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
+						if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT Suffix)", "trigger", match.key+"e", "baseKey", match.baseKey)
 							c.treatments.SetESWT(*eswtVal)
+							if inj, ok := match.value.(*models.Injection); ok && isEswtWarnSite(inj.GetEswtKey()) {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							}
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
@@ -868,6 +890,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if injEswt != nil {
 								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), "normal", false, injEswt.GetAddCode())
 								c.treatments.SetESWT(*eswt)
+								if isEswtWarnSite(inj.GetEswtKey()) {
+									eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+								}
 								processed[remainderPos] = true
 								remainderPos += 1
 								matchedSuffix = true
@@ -879,17 +904,15 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							matchedSuffix = true
 						}
 					} else if strings.HasPrefix(remainder, "y") {
-						if inj, ok := match.value.(*models.Injection); ok && inj.GetEswtKey() == "" {
-							eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
-							processed[remainderPos] = true
-							remainderPos += 1
-							matchedSuffix = true
-						} else if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
+						if eswtVal, exists := hotstrings.K_ESWT[match.baseKey]; exists {
 							slog.Debug("Hotstring Triggered (ESWT-CR Suffix)", "trigger", match.key+"y", "baseKey", match.baseKey)
 							newEswt := *eswtVal
 							newEswt.SetFeeType(constants.K_CR)
 							newEswt.SetAddCode(nil)
 							c.treatments.SetESWT(newEswt)
+							if inj, ok := match.value.(*models.Injection); ok && isEswtWarnSite(inj.GetEswtKey()) {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							}
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
@@ -906,6 +929,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							if injEswt != nil {
 								eswt := models.NewESWT(useInj.GetDirection(), injEswt.GetFocus(), injEswt.GetRadial(), constants.K_CR, false, nil)
 								c.treatments.SetESWT(*eswt)
+								if isEswtWarnSite(inj.GetEswtKey()) {
+									eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+								}
 								processed[remainderPos] = true
 								remainderPos += 1
 								matchedSuffix = true
@@ -941,6 +967,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 							} else {
 								c.treatments.SetAddExtraTreatments(*sntVal)
 							}
+							if inj, ok := match.value.(*models.Injection); ok && isEswtWarnSite(inj.GetEswtKey()) {
+								eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+							}
 							processed[remainderPos] = true
 							remainderPos += 1
 							matchedSuffix = true
@@ -959,6 +988,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 								}
 								snt := models.NewSonoStim(useInj.GetDirection(), injSnt.GetSite(), sntCode)
 								c.treatments.SetAddExtraTreatments(*snt)
+								if isEswtWarnSite(inj.GetEswtKey()) {
+									eswtForbiddenWarnings = append(eswtForbiddenWarnings, "★★★ "+match.baseKey+" eswt는 금지 부위 입니다")
+								}
 								processed[remainderPos] = true
 								remainderPos += 1
 								matchedSuffix = true
