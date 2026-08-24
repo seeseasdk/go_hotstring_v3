@@ -169,6 +169,8 @@ func (c *InputController) Start() {
 							}
 							if hasKnownPrefix {
 								processed = append(processed, "                "+trimmed) // 16칸
+							} else if strings.HasPrefix(trimmed, "cr) ") || trimmed == "cr)" {
+								processed = append(processed, "               "+trimmed) // 15칸
 							} else {
 								processed = append(processed, "                    "+trimmed) // 20칸
 							}
