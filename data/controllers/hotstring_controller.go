@@ -727,6 +727,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var etcOrderCodes []string
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
+	var matchedDrugDays string // d7 같은 약 일수 (f/u 자동 설정용)
 	var specificSonoStimInj *models.Injection // interscapular 등 specific sonostim을 가진 injection (cm5/cf5 등)
 	var matchedXrayBaseKeys []string
 	var matchedXrayValues []*models.Xray
@@ -1038,6 +1039,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 					if oc, exists := hotstrings.K_Drugs[match.baseKey]; exists {
 						output.SetDrugCode(oc)
 					}
+					matchedDrugDays = days
 				}
 			case "ESWT":
 				slog.Debug("Hotstring Triggered (ESWT)", "trigger", match.key)
@@ -1266,6 +1268,11 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	// e 모드(ESWT mode)에서 followUp이 설정되지 않은 경우 7일 후 f/u 자동 설정
 	if isEswtMode && c.treatments.GetFollowUp() == "" {
 		c.treatments.SetFollowUp("7")
+	}
+
+	// 주사와 함께 d7 같이 약 일수가 지정된 경우에만 명시적 f/u가 없으면 동일 일수로 자동 설정
+	if matchedDrugDays != "" && hasBlocksMatch && c.treatments.GetFollowUp() == "" {
+		c.treatments.SetFollowUp(matchedDrugDays)
 	}
 
 	// 모든 매치가 끝난 후 처리되지 않은 문자 중 'c'가 있으면 'caudal'로 처리, 'p'가 남으면 모든 injection을 isP = true로 변경
@@ -1585,6 +1592,17 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				}
 			}
 			combinedFirstMeeting.SetXray(newXrays)
+
+			// wrist/hand/finger/ankle/foot 부위는 trailing-s 시 pe를 chartText에서 제외
+			for _, site := range combinedFirstMeeting.GetSites() {
+				siteLower := strings.ToLower(site)
+				if strings.Contains(siteLower, "wrist") || strings.Contains(siteLower, "hand") ||
+					strings.Contains(siteLower, "finger") || strings.Contains(siteLower, "ankle") ||
+					strings.Contains(siteLower, "foot") {
+					combinedFirstMeeting.SetPhysicalExam("")
+					break
+				}
+			}
 		}
 	}
 
