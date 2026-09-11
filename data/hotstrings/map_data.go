@@ -1027,6 +1027,7 @@ var K_Drugs = map[string]string{
 	"due": ".+511", // aceclofenac + lebamefide + eperisone + ultracet
 	"du":  ".+54",  // aceclofenac + lebamefide + ultracet
 	"dp":  ".+52",
+	"dz":  ".+57",
 }
 
 var K_Coordinates = map[string]*models.Coordinate{
