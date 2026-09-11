@@ -727,7 +727,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	var etcOrderCodes []string
 	var lastBlockBaseKey string
 	var lastBlockInjection *models.Injection
-	var matchedDrugDays string // d7 같은 약 일수 (f/u 자동 설정용)
+	var matchedDrugDays string                // d7 같은 약 일수 (f/u 자동 설정용)
 	var specificSonoStimInj *models.Injection // interscapular 등 specific sonostim을 가진 injection (cm5/cf5 등)
 	var matchedXrayBaseKeys []string
 	var matchedXrayValues []*models.Xray
