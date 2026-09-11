@@ -1424,6 +1424,26 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 						}
 					}
 					processed[i] = true
+				} else if c.buffer[i] == 'm' {
+					if lastBlockInjection != nil {
+						// cervical block (cm/cf/cr/cd)은 방향으로 mcv+suffix 결정
+						isCervicalBlock := strings.HasPrefix(lastBlockBaseKey, "cm") || strings.HasPrefix(lastBlockBaseKey, "cf") ||
+							strings.HasPrefix(lastBlockBaseKey, "cr") || strings.HasPrefix(lastBlockBaseKey, "cd")
+						dirSuffix := map[string]string{constants.K_BOTH: "b", constants.K_RT: "r", constants.K_LT: "l"}[lastBlockInjection.GetDirection()]
+						var manualKey string
+						if isCervicalBlock {
+							manualKey = "mcv" + dirSuffix
+						} else if _, ok := hotstrings.K_Manual["m"+lastBlockBaseKey]; ok {
+							manualKey = "m" + lastBlockBaseKey
+						} else {
+							manualKey = "m" + lastBlockInjection.GetEswtKey()
+						}
+						if manualVal, exists := hotstrings.K_Manual[manualKey]; exists {
+							slog.Debug("Hotstring Triggered (Leftover 'm' -> Manual)", "trigger", manualKey)
+							c.treatments.SetManual(*manualVal)
+						}
+					}
+					processed[i] = true
 				}
 			}
 		}
@@ -1733,11 +1753,20 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			}
 		}
 		output.AddOrderCodeList(codes)
+		dosuManual := c.treatments.GetManual()
+		isDosuActive := !dosuManual.IsEmpty() && dosuManual.GetCode() == "dosu"
 		for _, ec := range etcOrderCodes {
+			// dosu가 있을 때 .+999_pf_0 제외 (pf_d로 대체)
+			if isDosuActive && hasCPrefix && ec == ".+999_pf_0" {
+				continue
+			}
 			output.AddOrderCode(ec)
 		}
 		for _, ac := range c.treatments.GetESWTAddCodes() {
 			output.AddOrderCode(ac)
+		}
+		if isDosuActive && hasCPrefix {
+			output.AddOrderCode(".+999_pf_d")
 		}
 
 		drug := c.treatments.GetDrug()
@@ -1746,20 +1775,35 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		}
 	}
 
-	// etc 코드가 .+999_pf_0 이면 "pt) saso\n    magnetic\n" 를 f/u) 앞에 삽입
+	// etc 코드가 .+999_pf_0 이면 chartText에 pt) 항목 및 자기장 삽입
 	if hasCPrefix {
 		ct := output.GetChartText()
 		magneticArea := ""
 		if area, exists := hotstrings.K_Magnetics[lastBlockBaseKey]; exists {
 			magneticArea = " " + area
 		}
-		insert := "pt) 사소\n     자기장" + magneticArea + "\n"
-		if strings.Contains(ct, "f/u)") {
-			ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
-		} else if ct != "" {
-			ct += insert
+		manual := c.treatments.GetManual()
+		if manual.GetCode() == "dosu" {
+			// dosu pt) 줄 바로 아래에 자기장만 추가 (사소 제거)
+			manualLine := "pt) " + manual.GetText() + "\n"
+			if strings.Contains(ct, manualLine) {
+				ct = strings.Replace(ct, manualLine, manualLine+"     자기장"+magneticArea+"\n", 1)
+			} else if strings.Contains(ct, "f/u)") {
+				ct = strings.Replace(ct, "f/u)", "     자기장"+magneticArea+"\nf/u)", 1)
+			} else if ct != "" {
+				ct += "     자기장" + magneticArea + "\n"
+			} else {
+				ct = "     자기장" + magneticArea + "\n"
+			}
 		} else {
-			ct = insert
+			insert := "pt) 사소\n     자기장" + magneticArea + "\n"
+			if strings.Contains(ct, "f/u)") {
+				ct = strings.Replace(ct, "f/u)", insert+"f/u)", 1)
+			} else if ct != "" {
+				ct += insert
+			} else {
+				ct = insert
+			}
 		}
 		output.SetChartText(ct)
 	}

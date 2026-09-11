@@ -898,9 +898,6 @@ func (i Treatments) GetOrderCode() ([]string, error) {
 			}
 		}
 	}
-	if !i.manual.IsEmpty() {
-		result = append(result, i.manual.code)
-	}
 	return result, nil
 }
 func (i Treatments) GetESWTAddCodes() []string {
