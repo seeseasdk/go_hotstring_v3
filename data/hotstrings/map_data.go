@@ -1136,14 +1136,15 @@ var K_Drugs = map[string]string{
 }
 
 var K_Coordinates = map[string]*models.Coordinate{
-	"chartWindow":    models.NewCoordinate(1000, 300),
-	"specificWindow": models.NewCoordinate(1400, 300),
-	"orderWindow":    models.NewCoordinate(620, 970),
-	"mx999Window":    models.NewCoordinate(1700, 500),
-	"memoWindow":     models.NewCoordinate(1700, 400),
-	"drugDayWindow":  models.NewCoordinate(870, 514),
-	"completeButton": models.NewCoordinate(960, 990),
-	"pacsButton":     models.NewCoordinate(820, 70),
+	"chartWindow":       models.NewCoordinate(1000, 300),
+	"specificWindow":    models.NewCoordinate(1400, 300),
+	"diseaseCodeWindow": models.NewCoordinate(800, 630),
+	"orderWindow":       models.NewCoordinate(620, 970),
+	"mx999Window":       models.NewCoordinate(1700, 500),
+	"memoWindow":        models.NewCoordinate(1700, 400),
+	"drugDayWindow":     models.NewCoordinate(870, 514),
+	"completeButton":    models.NewCoordinate(960, 990),
+	"pacsButton":        models.NewCoordinate(820, 70),
 }
 
 var K_Magnetics = map[string]string{

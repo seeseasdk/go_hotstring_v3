@@ -1777,7 +1777,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 			output.AddOrderCode(ec)
 		}
 		for _, ac := range c.treatments.GetESWTAddCodes() {
-			output.AddOrderCode(ac)
+			output.AddEswtAddCode(ac)
 		}
 		if isDosuActive && hasCPrefix {
 			output.AddOrderCode(".+999_pf_d")

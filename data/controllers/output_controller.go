@@ -156,6 +156,33 @@ func (c *OutputController) Start() {
 					}
 				}
 
+				eswtAddCodes := output.GetEswtAddCodes()
+				if len(eswtAddCodes) > 0 {
+					if coord, exists := hotstrings.K_Coordinates["diseaseCodeWindow"]; exists {
+						time.Sleep(50 * time.Millisecond)
+						robotgo.Move(coord.X, coord.Y)
+						robotgo.Click("left")
+						time.Sleep(50 * time.Millisecond)
+
+						robotgo.KeyToggle("ctrl", "down")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyTap("home")
+						time.Sleep(10 * time.Millisecond)
+						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(50 * time.Millisecond)
+
+						robotgo.KeyTap("insert")
+						time.Sleep(50 * time.Millisecond)
+
+						for _, ac := range eswtAddCodes {
+							robotgo.TypeStr(ac)
+							time.Sleep(500 * time.Millisecond)
+							robotgo.KeyTap("enter")
+							time.Sleep(500 * time.Millisecond)
+						}
+					}
+				}
+
 				drugCode := output.GetDrugCode()
 				drugDays := output.GetDrug()
 				orderCodes := output.GetOrderCode()

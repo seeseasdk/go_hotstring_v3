@@ -45,6 +45,7 @@ type OutputStuff struct {
 	specificText   string
 	mx999Text      string
 	orderCode      []string
+	eswtAddCodes   []string // ESWT addCode: diseaseCodeWindow에 입력
 	memoText       string
 	simpleText     string // 윈도우 상관없이 커서에 단순한 텍스트를 입력할 때 사용
 	drug           string // 약 날짜 (일수)
@@ -95,6 +96,20 @@ func (os *OutputStuff) AddOrderCode(orderCode string) {
 		}
 	}
 	os.orderCode = append(os.orderCode, orderCode)
+}
+func (os *OutputStuff) AddEswtAddCode(code string) {
+	if os.eswtAddCodes == nil {
+		os.eswtAddCodes = []string{}
+	}
+	for _, existing := range os.eswtAddCodes {
+		if existing == code {
+			return
+		}
+	}
+	os.eswtAddCodes = append(os.eswtAddCodes, code)
+}
+func (os *OutputStuff) GetEswtAddCodes() []string {
+	return os.eswtAddCodes
 }
 func (os *OutputStuff) AddOrderCodeList(orderCode []string) {
 	if os.orderCode == nil {
@@ -148,6 +163,7 @@ func (os *OutputStuff) SetReset() {
 	os.specificText = ""
 	os.mx999Text = ""
 	os.orderCode = nil
+	os.eswtAddCodes = nil
 	os.memoText = ""
 	os.simpleText = ""
 	os.drug = ""
@@ -191,6 +207,7 @@ func (os *OutputStuff) IsEmpty() bool {
 		os.specificText == "" &&
 		os.mx999Text == "" &&
 		len(os.orderCode) == 0 &&
+		len(os.eswtAddCodes) == 0 &&
 		os.memoText == "" &&
 		os.simpleText == "" &&
 		os.drug == "" &&
