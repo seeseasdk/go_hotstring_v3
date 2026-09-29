@@ -203,6 +203,7 @@ func (c *HotstringController) Start() {
 								}
 
 								// site prefix 정규화: "mbb/fjb/snrb/drgb C/L/T..." → "c/l/t + prefix..."
+								originalSite := site
 								lowerSite := strings.ToLower(site)
 								for _, pfx := range []string{"mbb", "fjb", "snrb", "drgb"} {
 									if strings.HasPrefix(lowerSite, pfx+" c") {
@@ -226,6 +227,19 @@ func (c *HotstringController) Start() {
 										code = v.GetCode()
 										mx999 = v.GetMx999()
 										break
+									}
+								}
+
+								// 정규화된 site로 매칭 실패 시 원본 site로 재시도 (예: "snrb L5" → "lsnrb L5" 매칭 실패 → "snrb" 매칭)
+								if code == "" && originalSite != site {
+									for _, v := range hotstrings.K_Blocks {
+										siteName := v.GetSite()
+										if strings.EqualFold(siteName, originalSite) || strings.HasPrefix(strings.ToLower(originalSite), strings.ToLower(siteName)+" ") {
+											code = v.GetCode()
+											mx999 = v.GetMx999()
+											site = originalSite
+											break
+										}
 									}
 								}
 
