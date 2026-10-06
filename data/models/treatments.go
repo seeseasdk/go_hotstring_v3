@@ -524,7 +524,7 @@ func (i Treatments) GetTextForSpecific() string {
 	}
 
 	// 클립보드 매모(복사한 텍스트)를 specificText에 추가 반영
-	// f/u) 라인 제외, pt)는 m8/m13만 허용(나머지 pt) 블록 연속 줄도 제외)
+	// f/u) 라인 제외, pt)는 m8/m13/도수 허용(나머지 pt) 블록 연속 줄도 제외)
 	knownSpecificPrefixes := []string{"c) ", "s) ", "p) ", "snt) ", "ef) ", "e) ", "pt) ", "pe) ", "f/u) ", "er) "}
 	inExcludeBlock := false
 	for _, memo := range i.clipboardMemos {
@@ -536,12 +536,15 @@ func (i Treatments) GetTextForSpecific() string {
 			continue
 		}
 
-		// pt) 라인: m8, m13만 허용, 나머지는 exclude block 시작
+		// pt) 라인: m8, m13, 도수 허용, 나머지는 exclude block 시작
 		if strings.HasPrefix(trimmed, "pt) ") || trimmed == "pt)" {
 			content := strings.TrimPrefix(trimmed, "pt) ")
 			if content == "m8" || content == "m13" ||
 				strings.HasPrefix(content, "m8 ") || strings.HasPrefix(content, "m13 ") {
 				inExcludeBlock = false
+			} else if strings.HasPrefix(content, "도수") {
+				// pt) 도수 라인은 specificText에 포함하되, 연속 줄은 제외
+				inExcludeBlock = true
 			} else {
 				inExcludeBlock = true
 				continue
