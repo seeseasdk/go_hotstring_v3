@@ -20,12 +20,28 @@ var (
 	kernel32                      = syscall.NewLazyDLL("kernel32.dll")
 	procGetForegroundWindow       = user32.NewProc("GetForegroundWindow")
 	procGetWindowThreadProcessId  = user32.NewProc("GetWindowThreadProcessId")
+	procGetKeyboardLayout         = user32.NewProc("GetKeyboardLayout")
 	procOpenProcess               = kernel32.NewProc("OpenProcess")
 	procQueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
 	procCloseHandle               = kernel32.NewProc("CloseHandle")
 )
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+// isKoreanKeyboardLayout returns true if the foreground window's active keyboard layout is Korean (LANGID 0x0412).
+// 한국어 IME 활성 시 Ctrl+Enter가 IME에 의해 일반 Enter로 변환되므로 앱에 '\n'이 입력된다.
+// 영어 모드에서는 Ctrl+Enter가 그대로 전달되어 앱이 단축키로 처리하므로 '\n'이 입력되지 않는다.
+func isKoreanKeyboardLayout() bool {
+	hwnd, _, _ := procGetForegroundWindow.Call()
+	if hwnd == 0 {
+		return false
+	}
+	var pid uint32
+	tid, _, _ := procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	hkl, _, _ := procGetKeyboardLayout.Call(tid)
+	langid := uint16(hkl & 0xFFFF)
+	return langid == 0x0412 // Korean
+}
 
 func getForegroundExeName() string {
 	hwnd, _, _ := procGetForegroundWindow.Call()

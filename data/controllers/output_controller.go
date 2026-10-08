@@ -52,6 +52,14 @@ func (c *OutputController) Start() {
 					robotgo.KeyToggle("ctrl", "up")
 					time.Sleep(10 * time.Millisecond)
 
+					// 한국어 IME가 아닌 경우 Ctrl+Enter의 Enter가 앱에 그대로 전달되지 않으므로
+					// Enter를 명시적으로 입력하여 트리거 문자('\n')가 텍스트 필드에 존재하도록 보장.
+					// 한국어 IME 활성 시에는 IME가 Ctrl+Enter를 일반 Enter로 변환하여 앱에 '\n'을 이미 입력함.
+					if !isKoreanKeyboardLayout() {
+						robotgo.KeyTap("enter")
+						time.Sleep(10 * time.Millisecond)
+					}
+
 					for i := 0; i < deleteSpace; i++ {
 						robotgo.KeyTap("backspace")
 						time.Sleep(10 * time.Millisecond) // 백스페이스 연속 입력간 아주 짧은 딜레이 (원상복구)
