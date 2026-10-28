@@ -45,11 +45,11 @@ func (c *HotstringController) Start() {
 					// 못한 상태에서 다시 트리거되면 누적되어 이중 출력이 발생하므로 즉시 초기화
 					isCtrlEnter := !isClipboard
 					if isCtrlEnter {
+						if c.buffer == "" {
+							slog.Warn("[TRIGGER] 버퍼가 비어있음 - 매칭 불가")
+						}
 						c.treatments = models.NewTreatments()
 					}
-
-					// 트리거 시점의 버퍼 내용을 디버그 로그에 기록
-					slog.Debug("HotstringController: Triggered", "buffer", c.buffer)
 
 					// Trigger processing of the accumulated buffer
 					output := c.processBuffer(isClipboard, isCtrlEnter)
@@ -83,7 +83,6 @@ func (c *HotstringController) Start() {
 						if char, exists := charMap["char"]; exists {
 							if charRune, ok := char.(rune); ok {
 								c.buffer += string(charRune)
-								slog.Debug("[BUFFER] updated", "buffer", c.buffer)
 							}
 						}
 					}
@@ -270,7 +269,12 @@ func (c *HotstringController) Start() {
 							}
 						}
 
-						slog.Info("[CLIPBOARD] Parsed to Treatments", "text", text)
+						slog.Info("[CLIPBOARD] Parsed to Treatments", "textHead", func() string {
+						if len(text) > 80 {
+							return text[:80] + "..."
+						}
+						return text
+					}())
 					}
 					continue
 				}
@@ -303,15 +307,13 @@ func (c *HotstringController) Start() {
 						if len(runes) > 0 {
 							c.buffer = string(runes[:len(runes)-1])
 						}
-						slog.Debug("[BUFFER] backspace", "buffer", c.buffer)
 					}
 					continue
 				}
 
 			case <-c.cc.ResetChan:
-				// Reset treatments when output is complete
-				c.treatments = models.NewTreatments()
-				slog.Debug("HotstringController: Treatments reset")
+					// Reset treatments when output is complete
+					c.treatments = models.NewTreatments()
 			}
 		}
 	}()
@@ -476,8 +478,9 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	if isFirstMeetingMode {
-		// duration 범위를 미리 계산해서 Simples 매칭 시 겹침 방지 (예: zlvbf1mmm → f1m + mm)
-		zDurRe := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
+		// duration 범위를 미리 계산해서 Simples 매칭 시 겹침 방지 (예: zlvbf1mmm → f1m + mm, zlvbf0mm → f0 + mm)
+		// f0은 단위 없이 "0"만 매칭 (f0m처럼 greedy하게 m을 삼키면 뒤의 mm을 못 찾음)
+		zDurRe := regexp.MustCompile(`f(0|[1-9]\d*[dmyw]?|o|d|m|y)`)
 		zDurLoc := zDurRe.FindStringIndex(c.buffer)
 
 		// z로 시작하면 나머지 문자열에서는 K_FirstMeeting + K_Simples을 연속으로 찾는다 (예: zcvbshb -> cvb, shb)
@@ -701,7 +704,6 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 		filtered := matches[:0]
 		for _, m := range matches {
 			if m.category == "Simples" && pDigitRe.MatchString(m.key) {
-				slog.Debug("Skipping p+digit Simples match due to Blocks context", "key", m.key)
 				continue
 			}
 			filtered = append(filtered, m)
@@ -1642,7 +1644,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 
 	// FirstMeeting 모드(z prefix)에서 f+숫자+[dmyw]? 패턴을 duration으로 처리하여 processed에 표시
 	if isFirstMeetingMode {
-		durationRe := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
+		durationRe := regexp.MustCompile(`f(0|[1-9]\d*[dmyw]?|o|d|m|y)`)
 		if durLoc := durationRe.FindStringIndex(c.buffer); durLoc != nil {
 			for pos := durLoc[0]; pos < durLoc[1]; pos++ {
 				processed[pos] = true
@@ -1673,7 +1675,7 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 	}
 
 	if isFirstMeetingMode && combinedFirstMeeting != nil {
-		re := regexp.MustCompile(`f(\d+[dmyw]?|o|d|m|y)`)
+		re := regexp.MustCompile(`f(0|[1-9]\d*[dmyw]?|o|d|m|y)`)
 		durationMatches := re.FindStringSubmatch(c.buffer)
 		if len(durationMatches) > 1 {
 			combinedFirstMeeting.SetDuration(durationMatches[1])
@@ -1933,22 +1935,36 @@ func (c *HotstringController) processBuffer(isClipboard bool, isCtrlEnter bool) 
 				byteIdx += utf8.RuneLen(r)
 			}
 		}
-		slog.Info("[DELETE] processed map size", "processedLen", deleteCount, "buffer", c.buffer, "bufferLen", len(c.buffer))
 		if deleteCount > 0 {
 			deleteCount += 1 // 트리거 키
 			// z/x/s/e prefix는 processed[0]=true로 포함되어 있으므로 별도 추가 불필요
 			if isFirstMeetingMode {
 				deleteCount += 1
 			}
+		} else {
+			slog.Warn("[TRIGGER] 매칭된 핫스트링 없음", "buffer", c.buffer,
+				"mode", func() string {
+					switch {
+					case isFirstMeetingMode:
+						return "firstMeeting(z)"
+					case isXrayMode:
+						return "xray(x)"
+					case isSonoMode:
+						return "sono(s)"
+					case isManualMode:
+						return "manual(m)"
+					case isEswtMode:
+						return "eswt(e)"
+					default:
+						return "normal"
+					}
+				}())
 		}
-		slog.Info("[DELETE] deleteCount before cap", "deleteCount", deleteCount,
-			"isFirstMeetingMode", isFirstMeetingMode, "isXrayMode", isXrayMode,
-			"isSonoMode", isSonoMode, "isEswtMode", isEswtMode)
 		if deleteCount > 20 {
 			deleteCount = 20
 		}
 		output.SetDeleteHostring(deleteCount)
-		slog.Info("[DELETE] final deleteCount set", "deleteCount", deleteCount)
+		slog.Debug("[TRIGGER] delete", "deleteCount", deleteCount)
 	}
 
 	return output

@@ -1126,13 +1126,18 @@ var K_Sonos = map[string]*models.Sono{
 }
 
 var K_Drugs = map[string]string{
-	"d":   ".+55",  // aceclofenac + lebamefide
-	"de":  ".+51",  // aceclofenac + lebamefide + eperisone
-	"deu": ".+511", // aceclofenac + lebamefide + eperisone + ultracet
-	"due": ".+511", // aceclofenac + lebamefide + eperisone + ultracet
-	"du":  ".+54",  // aceclofenac + lebamefide + ultracet
-	"dp":  ".+52",
-	"dz":  ".+57",
+	"d":     ".+55",   // aceclofenac + lebamefide
+	"de":    ".+51",   // aceclofenac + lebamefide + eperisone
+	"deu":   ".+511",  // aceclofenac + lebamefide + eperisone + ultracet
+	"due":   ".+511",  // aceclofenac + lebamefide + eperisone + ultracet
+	"du":    ".+54",   // aceclofenac + lebamefide + ultracet
+	"dp":    ".+52",   // 페낙손
+	"dz":    ".+57",   // 조스터급성
+	"dzn":   ".+58",   // 조스터만성
+	"dl25":  "+5l250", // 리리카25 비보험
+	"dl25b": "+5l251", // 리리카25 보험
+	"dl50":  "+5l500", // 리리카50 비보험
+	"dl50b": "+5l501", // 리리카50 보험
 }
 
 var K_Coordinates = map[string]*models.Coordinate{

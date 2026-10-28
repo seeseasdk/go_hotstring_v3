@@ -26,12 +26,9 @@ func (c *OutputController) Start() {
 	slog.Info("OutputController started")
 
 	go func() {
-		outputCount := 0
 		for stuff := range c.cc.OutputChan {
 			// Check if we received an OutputStuff update
 			if output, ok := stuff.Object.(*models.OutputStuff); ok {
-				outputCount++
-				slog.Warn("OutputController: Output Received", "outputCount", outputCount)
 
 				// 중복 등 에러가 있으면 키보드 입력 없이 에러 로그만 남기고 스킵
 				if errMsg := output.GetErrorMsg(); errMsg != "" {
@@ -45,12 +42,10 @@ func (c *OutputController) Start() {
 				slog.Info("Final Output", "result", result)
 
 				// 방금 입력한 트리거 문자열 길이만큼 백스페이스 눌러서 지우기
-				if deleteSpace := output.GetDeleteHostring(); deleteSpace > 0 {
-					slog.Debug("[BACKSPACE] Will tap backspace to delete hostring", "count", deleteSpace)
-
-					// Ctrl 키가 물리적으로 눌려있어 Ctrl+Backspace(단어 단위 지우기)가 발생하는 것을 막기 위해 강제 해제
-					robotgo.KeyToggle("ctrl", "up")
-					time.Sleep(10 * time.Millisecond)
+					if deleteSpace := output.GetDeleteHostring(); deleteSpace > 0 {
+						// Ctrl 키가 물리적으로 눌려있어 Ctrl+Backspace(단어 단위 지우기)가 발생하는 것을 막기 위해 강제 해제
+						robotgo.KeyToggle("ctrl", "up")
+						time.Sleep(10 * time.Millisecond)
 
 					// 한국어 IME가 아닌 경우 Ctrl+Enter의 Enter가 앱에 그대로 전달되지 않으므로
 					// Enter를 명시적으로 입력하여 트리거 문자('\n')가 텍스트 필드에 존재하도록 보장.
@@ -61,12 +56,11 @@ func (c *OutputController) Start() {
 					}
 
 					for i := 0; i < deleteSpace; i++ {
-						robotgo.KeyTap("backspace")
-						time.Sleep(10 * time.Millisecond) // 백스페이스 연속 입력간 아주 짧은 딜레이 (원상복구)
+							robotgo.KeyTap("backspace")
+							time.Sleep(10 * time.Millisecond)
+						}
+						time.Sleep(50 * time.Millisecond)
 					}
-					slog.Debug("[BACKSPACE] Finished", "count", deleteSpace)
-					time.Sleep(50 * time.Millisecond) // 다 지우고 약간 대기
-				}
 
 				// TypeStr 출력 시작 전 InputChan 경유 뮤팅 (채널 순서 보장으로 타이밍 버그 방지)
 				c.cc.IsMuting.Store(true)
@@ -297,15 +291,13 @@ func (c *OutputController) Start() {
 				}
 
 				// Send reset signal to clear
-				c.cc.ResetChan <- true
-				slog.Info("OutputController: Reset signal sent")
+					c.cc.ResetChan <- true
 
-				slog.Debug("--------------------------------------------------")
-				continue
-			}
+					continue
+				}
 
-			// Fallback for direct object passing (if ever used)
-			slog.Debug("OutputController received raw object", "object_type", fmt.Sprintf("%T", stuff.Object))
+				// Fallback: unexpected object type
+				slog.Debug("OutputController received raw object", "object_type", fmt.Sprintf("%T", stuff.Object))
 		}
 	}()
 }

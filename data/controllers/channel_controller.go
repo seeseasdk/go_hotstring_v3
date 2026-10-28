@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"log/slog"
 	"sync/atomic"
 
 	"github.com/seeseasdk/go_hotstring_v3/data/models"
@@ -22,7 +21,6 @@ type ChannelController struct {
 }
 
 func NewChannelController() *ChannelController {
-	slog.Debug("Creating ChannelController")
 	return &ChannelController{
 		InputChan:  make(chan *models.ChannelStuff, 100),
 		OutputChan: make(chan *models.ChannelStuff, 100),
